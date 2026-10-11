@@ -1,0 +1,8 @@
+{
+  "scenario": "Missing Playwright module invalidates the earlier success report",
+  "passed": true,
+  "observedProcessExit": 1,
+  "observedChecks": 0,
+  "executedAt": "2026-10-12T04:15:09.8026550+08:00",
+  "observedSmokePassed": false
+}

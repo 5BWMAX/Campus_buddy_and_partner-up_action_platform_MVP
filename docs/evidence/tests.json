@@ -1,0 +1,74 @@
+{
+  "status": "PASSED",
+  "passed": true,
+  "executedAt": "2026-10-12T04:06:03.2884290+08:00",
+  "skipped": 0,
+  "database": "campus_buddy_mvp2_test",
+  "suites": [
+    {
+      "tests": 5,
+      "name": "edu.campusbuddy.ApprovalTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 5.065,
+      "failures": 0
+    },
+    {
+      "tests": 7,
+      "name": "edu.campusbuddy.DeliveryTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 4.779,
+      "failures": 0
+    },
+    {
+      "tests": 4,
+      "name": "edu.campusbuddy.GovernancePrivacyTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.359,
+      "failures": 0
+    },
+    {
+      "tests": 4,
+      "name": "edu.campusbuddy.HttpSecurityTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.557,
+      "failures": 0
+    },
+    {
+      "tests": 8,
+      "name": "edu.campusbuddy.LifecycleTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2.882,
+      "failures": 0
+    },
+    {
+      "tests": 5,
+      "name": "edu.campusbuddy.RetryDiscoveryTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.959,
+      "failures": 0
+    },
+    {
+      "tests": 2,
+      "name": "edu.campusbuddy.RulesArchitectureTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.339,
+      "failures": 0
+    },
+    {
+      "tests": 6,
+      "name": "edu.campusbuddy.ScheduledBoundaryTest",
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2.04,
+      "failures": 0
+    }
+  ],
+  "total": 41
+}

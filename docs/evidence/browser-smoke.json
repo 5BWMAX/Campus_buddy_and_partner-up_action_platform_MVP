@@ -1,0 +1,79 @@
+{
+  "startedAt": "2026-10-11T20:15:09.880Z",
+  "base": "https://localhost:8444",
+  "browser": "Microsoft Edge (Chromium)",
+  "passed": true,
+  "checks": [
+    {
+      "name": "PostgreSQL verified TLS",
+      "detail": "pg_stat_ssl=true; verify-full client"
+    },
+    {
+      "name": "UI publish commits owner and activity",
+      "detail": "7693ce47-0c75-4a69-ac5b-bc4316bd9f5c"
+    },
+    {
+      "name": "UI application creates PENDING without occupying a place",
+      "detail": "c795f1c4-d267-47a0-9e65-539810c4de65"
+    },
+    {
+      "name": "UI approval builds exactly one group",
+      "detail": {
+        "status": "APPROVED",
+        "groupId": "fa84067c-d99e-49a7-9aa0-837851774ff3",
+        "participationId": "7e19b4c3-6be2-4e70-9287-f13f0521673a",
+        "occupied": 2,
+        "capacity": 3,
+        "applicationVersion": 1,
+        "activityVersion": 0
+      }
+    },
+    {
+      "name": "UI pin and chat persist",
+      "detail": "1"
+    },
+    {
+      "name": "UI leave retains place; exit revokes group immediately",
+      "detail": "2 -> 1 occupied; old group GET 404"
+    },
+    {
+      "name": "UI reapplication increments round and reuses group",
+      "detail": 2
+    },
+    {
+      "name": "UI feedback shows persisted single submission",
+      "detail": "existing submission confirmed; duplicate prevention covered by integration tests"
+    },
+    {
+      "name": "UI report, disposition, appeal and review create complete audit",
+      "detail": "990a8e02-8574-493f-ad8d-810d773fb673"
+    },
+    {
+      "name": "Admin export contains aggregate metrics only",
+      "detail": "CSV asserted"
+    },
+    {
+      "name": "UI cancellation leaves terminal state and records",
+      "detail": "CANCELLED"
+    },
+    {
+      "name": "360px layout has no horizontal overflow",
+      "detail": "discovery and expanded navigation"
+    },
+    {
+      "name": "UI logout invalidates session",
+      "detail": "guest UI and protected profile GET 401"
+    }
+  ],
+  "pageErrors": [],
+  "serverErrors": [],
+  "screenshots": [
+    "desktop-discovery.png",
+    "desktop-group.png",
+    "desktop-statistics.png",
+    "mobile-360-discovery.png",
+    "mobile-360-navigation.png"
+  ],
+  "activityId": "7693ce47-0c75-4a69-ac5b-bc4316bd9f5c",
+  "finishedAt": "2026-10-11T20:15:17.733Z"
+}

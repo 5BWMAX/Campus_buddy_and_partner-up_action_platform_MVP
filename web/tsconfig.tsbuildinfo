@@ -1,0 +1,1 @@
+{"root":["./src/api.ts","./src/main.ts","./src/app.vue","./src/components/activitydialog.vue","./src/components/discover.vue","./src/components/feedbackdialog.vue","./src/components/governance.vue","./src/components/groupchat.vue","./src/components/myactivities.vue","./src/components/notifications.vue","./src/components/profile.vue","./vite.config.ts"],"version":"5.9.3"}

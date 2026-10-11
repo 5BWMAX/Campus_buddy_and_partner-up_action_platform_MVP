@@ -1,0 +1,8 @@
+.local/
+**/target/
+web/node_modules/
+web/dist/
+*.log
+*.p12
+*.key
+backups/

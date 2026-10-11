@@ -1,0 +1,64 @@
+server:
+  address: 127.0.0.1
+  port: ${PORT:8443}
+  ssl:
+    enabled: ${TLS_ENABLED:true}
+    key-store: ${TLS_KEYSTORE:file:.local/localhost.p12}
+    key-store-password: ${TLS_PASSWORD}
+    key-store-type: PKCS12
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        http-only: true
+        secure: ${TLS_ENABLED:true}
+        same-site: lax
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  task:
+    scheduling:
+      pool:
+        size: 2
+  application:
+    name: campus-buddy
+  profiles:
+    default: demo
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/campus_buddy_mvp2}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 10000
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+  flyway:
+    enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+campus:
+  crypto-key: ${APP_CRYPTO_KEY}
+  cursor-key: ${APP_CURSOR_KEY}
+  scheduler-enabled: ${SCHEDULER_ENABLED:true}
+  mock-push-fail: ${MOCK_PUSH_FAIL:false}
+  reminder-minutes: 30
+  pending-reminder-minutes: 10
+logging:
+  level:
+    org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer: ERROR
