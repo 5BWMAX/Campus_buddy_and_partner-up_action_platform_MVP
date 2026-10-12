@@ -29,7 +29,31 @@ node .\scripts\smoke.mjs
 
 `build.ps1` 执行 npm ci、TypeScript 检查、Vite 构建、真实数据库测试，最后跳过重复测试打包 JAR。`-SkipTests` 只供临时开发使用，不能作为验收结果。仅运行测试可使用 `pwsh -NoProfile -File .\scripts\test.ps1`。
 
-后端直连为 `https://localhost:8443`；`start.ps1 -NoProxy` 可用于后端排查。应用和 Nginx 仅监听回环地址。启动失败查看 `.local/app.log`、`.local/app-error.log` 及 `.local/nginx-1.30.5/logs/error.log`。readiness 地址为 `/actuator/health/readiness`。
+后端直连为 `https://localhost:8443`；`start.ps1 -NoProxy` 可用于后端排查。默认模式下应用和 Nginx 仅监听回环地址，需要手机访问时见下节。启动失败查看 `.local/app.log`、`.local/app-error.log` 及 `.local/nginx-1.30.5/logs/error.log`。readiness 地址为 `/actuator/health/readiness`。
+
+## 局域网与手机演示
+
+默认模式只监听回环，手机无法访问。`scripts/start-lan.ps1` 会签发局域网专用证书、生成局域网版 Nginx 配置并启动服务，手机与电脑处于同一网络后即可用浏览器打开。
+
+```powershell
+# 首次运行会列出本机候选地址供选择，可直接回车取推荐项
+pwsh -NoProfile -File .\scripts\start-lan.ps1
+# 也可直接指定手机要访问的地址；-OpenFirewall 需在管理员 shell 中使用
+pwsh -NoProfile -File .\scripts\start-lan.ps1 -Address 192.168.1.23
+```
+
+对外入口为 `https://<电脑局域网IP>:8444`。链路为手机 → Nginx（监听该局域网地址）→ 后端（仍为 `127.0.0.1:8443`），**应用进程本身不暴露到网络**。局域网模式的生成物 `.local/lan.crt`、`.local/lan.key`、`.local/lan.json`、`.local/nginx-lan.conf` 均在忽略范围内，不进入仓库。
+
+- 该模式不修改 `application.yml`、`deploy/nginx.conf` 与既有脚本；`stop.ps1` 同样可以停止局域网模式。
+- 需要放行本机防火墙 8444 入站：用管理员 PowerShell 执行 `New-NetFirewallRule -DisplayName "CampusBuddy LAN 8444" -Direction Inbound -Protocol TCP -LocalPort 8444 -Action Allow -Profile Private -RemoteAddress LocalSubnet`，或以管理员身份运行脚本并加 `-OpenFirewall`。
+- 证书绑定所选 IP，有效期 365 天；换网络导致 IP 变化后重新运行脚本即可，会自动重新签发。
+- 校园网等受管网络可能启用客户端隔离，此时同一网络下的手机仍连不上；改用手机开热点、电脑连该热点，两端即处于同一私有网络。
+- 本机经局域网地址自测通过，不代表手机一定能连：防火墙与客户端隔离都会拦截。
+- 该通道使用 demo 身份适配器，能打开该地址的人均可直接选择任一演示身份（含平台管理员）。仅限演示期间开启，结束后立即执行 `stop.ps1`。
+
+恢复到默认回环模式：先 `pwsh -NoProfile -File .\scripts\stop.ps1`，再 `pwsh -NoProfile -File .\scripts\start.ps1`。
+
+验证状态（2026-10-12）：本机经 `https://<局域网IP>:8444/actuator/health/readiness` 自测通过；手机浏览器实机访问由人工确认可用，该结论没有自动化证据文件，也不构成浏览器/机型矩阵验证。桌面与 360px 视口的自动化证据见「验证记录」一节。
 
 ## 演示范围
 

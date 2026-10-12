@@ -71,9 +71,12 @@ Session Cookie 使用 Secure、HttpOnly、SameSite=Lax。写请求使用 JSON �
 
 ## 本地运行注意事项
 
-- Nginx 与应用只监听回环。本地自签证书有效期以 `.local/localhost.p12` 实际内容为准，尚无自动续期。
+- 默认模式下 Nginx 与应用只监听回环。本地自签证书有效期以 `.local/localhost.p12` 实际内容为准，尚无自动续期。局域网演示模式见本节末尾。
 - PostgreSQL TLS 配置通过 `ALTER SYSTEM` 和 reload 应用到当前本机实例，原非 TLS 连接方式仍可使用；本项目应用和烟测选用 verify-full。没有停用或重建用户既有数据库。
 - 原设置在 `.local/pg-tls-before.json`。`pwsh -File .\scripts\enable-db-tls.ps1 -Restore` 只恢复 PostgreSQL 的 ssl、ssl_cert_file、ssl_key_file，并不会同时恢复项目 settings.json 中的客户端连接参数。
 - 如确需回滚为原非 TLS 本地方案，应先停止本项目，在当前 shell 临时移除 PGSSLMODE/PGSSLROOTCERT 的连接强制参数，再执行 Restore；随后将 settings.json 的 DB_URL/TEST_DB_URL 改回原本地 JDBC URL，移除 PGSSLMODE/PGSSLROOTCERT 配置，并新开终端。回滚后不能再把连接算作全链路 TLS，当前严格烟测也会拒绝该环境。不要在正常演示前主动回滚。
 - `.local/run` 是运行副本，构建新的 target JAR 后需要 stop/start 才切换运行版本。重启保留数据库和所有演示记录。
+- 局域网演示模式（`scripts/start-lan.ps1`）把 Nginx 的对外监听改为本机某个局域网地址，并签发含该 IP 的独立证书 `.local/lan.crt` / `lan.key`；应用仍只监听 `127.0.0.1:8443`，因此默认模式下「应用与代理仅监听回环」的结论继续成立，局域网模式下仅代理入口对本机所在子网可见。后端证书校验对象不变，Nginx 仍信任 `.local/localhost.crt`。
+- `.local/nginx-lan.conf` 由 `deploy/nginx.conf` 做精确替换生成，每处匹配数不为 1 时脚本报错退出、不生成配置；模式切换不改动 `application.yml`、`deploy/nginx.conf` 与既有脚本。
+- 局域网模式会把 demo 身份适配器暴露到本机所在子网，同一子网内任何设备都能切换到管理员身份，因此只应在演示期间开启。该模式尚未做速率限制以外的接入控制，也没有多用户并发验证。
 - Docker、真实认证/推送、备份恢复和多实例容量验证不属于本轮已完成声明，详见验收对照。
