@@ -4,6 +4,7 @@ import org.slf4j.*;
 import org.springframework.dao.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -32,6 +33,13 @@ public class Errors {
   })
   public ResponseEntity<Row> transientError(Exception e) {
     return problem(new Problem(503, "TEMPORARILY_UNAVAILABLE", "数据库繁忙，请保留原请求标识重试"));
+  }
+
+  @ExceptionHandler(UncategorizedSQLException.class)
+  public ResponseEntity<Row> uncategorized(UncategorizedSQLException e) {
+    if (e.getSQLException() != null && "55P03".equals(e.getSQLException().getSQLState()))
+      return transientError(e);
+    return other(e);
   }
 
   @ExceptionHandler({
