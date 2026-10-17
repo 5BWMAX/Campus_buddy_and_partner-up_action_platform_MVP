@@ -25,6 +25,10 @@ public class ActivityRepository {
     return sql.must("select * from activity where id=? for update", id);
   }
 
+  public Row share(UUID id) {
+    return sql.must("select * from activity where id=? for share", id);
+  }
+
   public void create(Row a) {
     sql.update(
         "insert into"

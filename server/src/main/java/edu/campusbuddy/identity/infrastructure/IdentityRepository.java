@@ -19,8 +19,23 @@ public class IdentityRepository {
         id);
   }
 
+  public List<Row> users(Collection<UUID> ids) {
+    if (ids.isEmpty()) return List.of();
+    String parameters = String.join(",", Collections.nCopies(ids.size(), "?"));
+    return sql.list(
+        "select u.*,p.contact_visibility,p.location_visibility from user_account u join"
+            + " privacy_setting p on p.user_id=u.id where u.id in ("
+            + parameters
+            + ")",
+        ids.toArray());
+  }
+
   public void lock(UUID id) {
     sql.must("select id from user_account where id=? for update", id);
+  }
+
+  public void lockReference(UUID id) {
+    sql.must("select id from user_account where id=? for key share", id);
   }
 
   public boolean exists(UUID id) {

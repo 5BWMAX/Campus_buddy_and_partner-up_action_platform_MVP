@@ -59,6 +59,11 @@ public class ActivityService implements ActivityApi {
   }
 
   @Transactional(propagation = Propagation.MANDATORY)
+  public Row share(UUID id) {
+    return repo.share(id);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
   public Row lockOpen(UUID id) {
     Row a = repo.lock(id);
     ActivityRules.open(a, clock.instant());
@@ -97,11 +102,10 @@ public class ActivityService implements ActivityApi {
             "publicLon");
     out.put("occupied", team.occupied(id));
     out.put("remaining", a.num("capacity") - team.occupied(id));
-    Row g = team.group(id);
     if (actor != null) {
       try {
-        team.members(actor, id);
-        if (g != null) out.put("groupId", g.get("id"));
+        UUID group = team.requireActivityDetailsAccess(actor, id);
+        if (group != null) out.put("groupId", group);
         Row owner = identity.profile(a.id("ownerId"));
         if (owner.text("locationVisibility").equals("GROUP") || actor.equals(a.id("ownerId")))
           out.put("exactLocation", crypto.decrypt(a.text("exactLocationCiphertext")));
