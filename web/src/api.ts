@@ -27,6 +27,34 @@ export async function api<T = any>(path: string, method = 'GET', body?: unknown,
 }
 export async function refreshSession() { Object.assign(session, await api('/auth/session')) }
 export async function login(userId: string) { await api('/auth/demo', 'POST', { userId }); await refreshSession() }
+
+// ===== 活动收藏 =====
+export async function favoriteActivity(id: string) { return api<{favorited:boolean,count:number}>(`/activities/${id}/favorite`, 'POST') }
+export async function unfavoriteActivity(id: string) { return api<{favorited:boolean,count:number}>(`/activities/${id}/favorite`, 'DELETE') }
+export async function myFavorites(cursor?: string) { return api<{items:Data[],nextCursor:string|null}>(`/activities/favorites/mine${cursor?'?cursor='+encodeURIComponent(cursor):''}`) }
+
+// ===== 消息撤回 =====
+export async function recallMessage(groupId: string, messageId: string) { return api(`/groups/${groupId}/messages/${messageId}/recall`, 'POST') }
+
+// ===== 图片上传 =====
+export async function uploadImage(file: File): Promise<{url:string,fileName:string,contentType:string,size:number}> {
+  const form = new FormData()
+  form.append('file', file)
+  const headers: Record<string,string> = { 'X-CSRF-Token': session.csrf }
+  const res = await fetch('/api/v1/media/upload', { method: 'POST', headers, body: form, credentials: 'same-origin' })
+  const payload = await res.json()
+  if (!res.ok) throw new ApiError(payload.code || 'UPLOAD_FAILED', payload.message || '上传失败', payload.requestId || '', res.status)
+  return payload.data
+}
+
+// ===== 搜索历史 =====
+export async function getSearchHistory() { return api<Data[]>('/activities/search-history') }
+export async function clearSearchHistory() { return api('/activities/search-history', 'DELETE') }
+export async function deleteSearchHistory(keyword: string) { return api(`/activities/search-history/${encodeURIComponent(keyword)}`, 'DELETE') }
+
+// ===== 通知偏好 =====
+export async function getNotificationPreferences() { return api<Data>('/notifications/preferences') }
+export async function updateNotificationPreferences(prefs: Data) { return api<Data>('/notifications/preferences', 'PUT', prefs) }
 export const labels: Record<string, string> = {
  STUDY: '学习自习', SPORT: '运动健身', TRAVEL: '出行探索', MEAL: '吃饭搭伙', OTHER: '兴趣生活',
  OPEN: '招募中', IN_PROGRESS: '进行中', ENDED: '已结束', CANCELLED: '已取消', ARCHIVED: '已归档',

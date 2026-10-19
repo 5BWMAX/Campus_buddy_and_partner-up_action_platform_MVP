@@ -12,23 +12,36 @@ import org.springframework.transaction.annotation.*;
 @Service
 public class NotificationService implements NotificationApi {
   private final NotificationRepository repo;
+  private final NotificationPreferenceRepository prefs;
   private final Clock clock;
   private final Cursor cursor;
 
-  public NotificationService(NotificationRepository r, Clock c, Cursor page) {
+  public NotificationService(NotificationRepository r, NotificationPreferenceRepository p, Clock c, Cursor page) {
     repo = r;
+    prefs = p;
     clock = c;
     cursor = page;
   }
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void record(UUID user, UUID activity, String type, String key, Row data) {
+    // 检查用户通知偏好
+    if (!prefs.enabled(user, type)) return;
     Row payload = new Row(data);
     payload.put("activityId", activity);
     payload.put("schemaVersion", 1);
     payload.put("occurredAt", clock.instant());
     payload.put("template", type);
     repo.record(user, type, UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)), payload);
+  }
+
+  public Row preferences(UUID user) {
+    return prefs.find(user);
+  }
+
+  @Transactional
+  public Row updatePreferences(UUID user, Map<String, Object> b) {
+    return prefs.update(user, b);
   }
 
   public Row list(UUID user, boolean unread, String token, int size) {

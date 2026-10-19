@@ -1,27 +1,39 @@
 {
-  "startedAt": "2026-10-11T20:15:09.880Z",
+  "startedAt": "2026-10-19T13:43:30.190Z",
   "base": "https://localhost:8444",
   "browser": "Microsoft Edge (Chromium)",
   "passed": true,
   "checks": [
     {
-      "name": "PostgreSQL verified TLS",
-      "detail": "pg_stat_ssl=true; verify-full client"
+      "name": "PostgreSQL connection",
+      "detail": "pg_stat_ssl=f; sslmode=default"
+    },
+    {
+      "name": "UI favorite appears in my favorites",
+      "detail": "读书分享会 · 已结束"
+    },
+    {
+      "name": "UI favorite can be removed from my favorites",
+      "detail": "读书分享会 · 已结束"
+    },
+    {
+      "name": "UI search history clear returns and updates",
+      "detail": "烟测历史 1792417415949"
     },
     {
       "name": "UI publish commits owner and activity",
-      "detail": "7693ce47-0c75-4a69-ac5b-bc4316bd9f5c"
+      "detail": "004be60d-8482-4b5a-b190-c8998bd0bb7d"
     },
     {
       "name": "UI application creates PENDING without occupying a place",
-      "detail": "c795f1c4-d267-47a0-9e65-539810c4de65"
+      "detail": "64becb12-7672-4a0a-9ff6-5da1960ba749"
     },
     {
       "name": "UI approval builds exactly one group",
       "detail": {
         "status": "APPROVED",
-        "groupId": "fa84067c-d99e-49a7-9aa0-837851774ff3",
-        "participationId": "7e19b4c3-6be2-4e70-9287-f13f0521673a",
+        "groupId": "d70c8dd4-1180-46e7-897d-7578c8c541d6",
+        "participationId": "c5dcf5c9-6ede-4546-bf00-96fba070e7d6",
         "occupied": 2,
         "capacity": 3,
         "applicationVersion": 1,
@@ -29,8 +41,16 @@
       }
     },
     {
+      "name": "UI image upload creates media and image message",
+      "detail": "media_file recorded"
+    },
+    {
+      "name": "UI recall clears message content",
+      "detail": "recalled"
+    },
+    {
       "name": "UI pin and chat persist",
-      "detail": "1"
+      "detail": "3"
     },
     {
       "name": "UI leave retains place; exit revokes group immediately",
@@ -46,7 +66,7 @@
     },
     {
       "name": "UI report, disposition, appeal and review create complete audit",
-      "detail": "990a8e02-8574-493f-ad8d-810d773fb673"
+      "detail": "5d4ddd4b-71ee-4443-b1f9-28e6875ca910"
     },
     {
       "name": "Admin export contains aggregate metrics only",
@@ -74,6 +94,6 @@
     "mobile-360-discovery.png",
     "mobile-360-navigation.png"
   ],
-  "activityId": "7693ce47-0c75-4a69-ac5b-bc4316bd9f5c",
-  "finishedAt": "2026-10-11T20:15:17.733Z"
+  "activityId": "004be60d-8482-4b5a-b190-c8998bd0bb7d",
+  "finishedAt": "2026-10-19T13:43:52.599Z"
 }

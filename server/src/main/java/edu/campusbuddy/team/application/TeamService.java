@@ -74,6 +74,15 @@ public class TeamService implements TeamApi {
     Problem.require(actor.equals(a.id("ownerId")), 403, "FORBIDDEN", "只有发起人可审核");
   }
 
+  private void requireGroupNotBlocked(UUID activity) {
+    Row g = repo.group(activity);
+    Problem.require(
+        g == null || !g.text("accessMode").equals("BLOCKED"),
+        409,
+        "GROUP_BLOCKED",
+        "小组已被治理解散，不能继续申请或批准");
+  }
+
   private void version(Row app, Map<String, Object> b) {
     Problem.require(
         app.num("round") == Input.number(b, "round", 1, Integer.MAX_VALUE),
@@ -98,6 +107,7 @@ public class TeamService implements TeamApi {
           identity.lockUsers(List.of(actor));
           identity.requireVerified(actor);
           Row a = activities.lockOpen(activity);
+          requireGroupNotBlocked(activity);
           Problem.require(!actor.equals(a.id("ownerId")), 409, "OWN_ACTIVITY", "不能申请自己的活动");
           room(a);
           requireNoConflict(actor, a.time("startAt"), a.time("endAt"), activity);
@@ -148,6 +158,7 @@ public class TeamService implements TeamApi {
           identity.requireVerified(pre.id("userId"));
           Row a = activities.lockOpen(activity);
           owner(actor, a);
+          requireGroupNotBlocked(activity);
           Row app = repo.application(appId, true);
           Problem.require(
               app.id("activityId").equals(activity) && app.id("userId").equals(pre.id("userId")),
@@ -425,7 +436,17 @@ public class TeamService implements TeamApi {
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void block(UUID activity, boolean value) {
-    repo.block(activity, value);
+    if (value) {
+      repo.accessMode(activity, "BLOCKED");
+      return;
+    }
+    Row a = activities.find(activity);
+    boolean live =
+        List.of("OPEN", "IN_PROGRESS").contains(a.text("status"))
+            && clock.instant().isBefore(a.time("endAt"));
+    // Revoking a dissolution restores writing only while the activity is still live.
+    // Ended, cancelled or archived activities remain read-only.
+    repo.accessMode(activity, live ? "ACTIVE" : "READ_ONLY");
   }
 
   @Transactional

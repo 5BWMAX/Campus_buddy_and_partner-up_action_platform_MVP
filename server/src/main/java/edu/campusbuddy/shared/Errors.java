@@ -34,6 +34,11 @@ public class Errors {
     return problem(new Problem(503, "TEMPORARILY_UNAVAILABLE", "数据库繁忙，请保留原请求标识重试"));
   }
 
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  public ResponseEntity<Row> uploadTooLarge(Exception e) {
+    return problem(new Problem(413, "PAYLOAD_TOO_LARGE", "图片不能超过5MB"));
+  }
+
   @ExceptionHandler({
     org.springframework.web.servlet.resource.NoResourceFoundException.class,
     org.springframework.web.servlet.NoHandlerFoundException.class

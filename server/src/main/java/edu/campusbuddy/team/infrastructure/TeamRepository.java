@@ -178,10 +178,10 @@ public class TeamRepository {
         activity);
   }
 
-  public void block(UUID activity, boolean value) {
+  public void accessMode(UUID activity, String mode) {
     sql.update(
         "update temporary_group set access_mode=?,version=version+1 where activity_id=?",
-        value ? "BLOCKED" : "READ_ONLY",
+        mode,
         activity);
   }
 

@@ -33,15 +33,20 @@ public class RequestFilter extends OncePerRequestFilter {
     long start = System.nanoTime();
     try {
       boolean write = !List.of("GET", "HEAD", "OPTIONS").contains(req.getMethod());
+      boolean upload = isMediaUpload(req);
       if (req.getRequestURI().startsWith("/api/") && write) {
-        String ct = req.getContentType();
-        if (ct == null || !ct.toLowerCase().startsWith("application/json")) {
-          reject(res, 415, "CONTENT_TYPE_REQUIRED", "写操作需要application/json", id);
-          return;
-        }
-        if (req.getContentLengthLong() > 65536) {
-          reject(res, 413, "PAYLOAD_TOO_LARGE", "请求超过64KB", id);
-          return;
+        // JSON business writes are capped at 64 KiB. The image endpoint is the one
+        // intentional exception: it is multipart and enforces its own 5 MiB limit.
+        if (!upload) {
+          String ct = req.getContentType();
+          if (ct == null || !ct.toLowerCase().startsWith("application/json")) {
+            reject(res, 415, "CONTENT_TYPE_REQUIRED", "写操作需要application/json", id);
+            return;
+          }
+          if (req.getContentLengthLong() > 65536) {
+            reject(res, 413, "PAYLOAD_TOO_LARGE", "请求超过64KB", id);
+            return;
+          }
         }
         String client =
             req.getSession(false) == null ? req.getRemoteAddr() : req.getSession(false).getId();
@@ -58,7 +63,7 @@ public class RequestFilter extends OncePerRequestFilter {
         }
         if (windows.size() > 10000) windows.entrySet().removeIf(e -> e.getValue().minute < minute);
       }
-      if (req.getRequestURI().startsWith("/api/") && write) {
+      if (req.getRequestURI().startsWith("/api/") && write && !upload) {
         byte[] bytes = req.getInputStream().readNBytes(65537);
         if (bytes.length > 65536) {
           reject(res, 413, "PAYLOAD_TOO_LARGE", "请求超过64KB", id);
@@ -106,6 +111,10 @@ public class RequestFilter extends OncePerRequestFilter {
             (System.nanoTime() - start) / 1000000);
       MDC.remove("requestId");
     }
+  }
+
+  private boolean isMediaUpload(HttpServletRequest req) {
+    return "POST".equals(req.getMethod()) && "/api/v1/media/upload".equals(req.getRequestURI());
   }
 
   private void reject(HttpServletResponse res, int status, String code, String message, String id)

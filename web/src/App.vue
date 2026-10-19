@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, provide, computed } from 'vue'
-import { Compass, CalendarDays, Bell, UserRound, ShieldCheck, ArrowUpRight, Plus, Sprout, LogOut, Menu, X, Check, CircleAlert } from 'lucide-vue-next'
-import { api, session, refreshSession, login, describeError, type Data } from './api'
+import { ref, reactive, onMounted, provide, computed } from 'vue'
+import { Compass, CalendarDays, Bell, Heart, UserRound, ShieldCheck, ArrowUpRight, Plus, Sprout, LogOut, Menu, X, Check, CircleAlert } from 'lucide-vue-next'
+import { api, session, refreshSession, login, describeError, favoriteActivity, unfavoriteActivity, type Data } from './api'
 import Discover from './components/Discover.vue'
+import Favorites from './components/Favorites.vue'
 import ActivityDialog from './components/ActivityDialog.vue'
 import MyActivities from './components/MyActivities.vue'
 import GroupChat from './components/GroupChat.vue'
@@ -19,6 +20,17 @@ provide('openActivity',(id:string)=>dialog.value={id})
 provide('openGroup',(a:Data)=>group.value=a)
 provide('requireLogin',()=>{loginOpen.value=true})
 provide('changed',()=>{revision.value++; updateUnread()})
+const favorites = reactive<Record<string, boolean>>({})
+function isFavorite(id:string){ return favorites[id]===true }
+function setFavorite(id:string, value:boolean){ if(value) favorites[id]=true; else delete favorites[id] }
+function syncFavorites(items:Data[]){ for(const a of items) if(a?.id) setFavorite(String(a.id), a.favorited===true) }
+async function toggleFavorite(id:string){
+ const was=isFavorite(id)
+ await (was?unfavoriteActivity(id):favoriteActivity(id))
+ setFavorite(id,!was)
+ notify(was?'已取消收藏':'已收藏活动')
+}
+provide('favorites',{isFavorite,toggleFavorite,syncFavorites,setFavorite})
 async function updateUnread(){if(!session.user || session.user.status!=='NORMAL'){unread.value=0;return}try{unread.value=(await api('/notifications?pageSize=1')).unreadCount}catch(e){notify(describeError(e),true)}}
 async function bootstrap(){try{await refreshSession();if(session.demo)accounts.value=await api('/auth/demo/accounts');await updateUnread();ready.value=true}catch(e){notify(describeError(e),true)}}
 onMounted(bootstrap)
@@ -27,7 +39,7 @@ async function logout(){try{await api('/auth/logout','POST');await refreshSessio
 function navigate(name:string){if(name!=='discover'&&!session.user){loginOpen.value=true;return}tab.value=name;mobileOpen.value=false;group.value=null}
 function publish(){if(!session.user){loginOpen.value=true;return}dialog.value={create:true}}
 const nav=computed(()=>[
- {id:'discover',name:'发现搭子',icon:Compass}, {id:'mine',name:'我的行动',icon:CalendarDays}, {id:'notifications',name:'通知中心',icon:Bell}, {id:'profile',name:'我的资料',icon:UserRound}, {id:'governance',name:session.user?.role==='ADMIN'?'治理与统计':'举报与申诉',icon:ShieldCheck}
+ {id:'discover',name:'发现搭子',icon:Compass}, {id:'mine',name:'我的行动',icon:CalendarDays}, {id:'favorites',name:'我的收藏',icon:Heart}, {id:'notifications',name:'通知中心',icon:Bell}, {id:'profile',name:'我的资料',icon:UserRound}, {id:'governance',name:session.user?.role==='ADMIN'?'治理与统计':'举报与申诉',icon:ShieldCheck}
 ])
 </script>
 <template>
@@ -48,6 +60,7 @@ const nav=computed(()=>[
     <div v-if="session.user && session.user.status!=='NORMAL'" class="warning-box">当前账号已受限，仍可查看相关举报并提出申诉。</div>
     <Discover v-if="tab==='discover'" :key="`discover-${revision}`" @publish="publish"/>
     <MyActivities v-else-if="tab==='mine'" :key="`mine-${revision}`" @edit="id=>dialog={id,edit:true}" @publish="publish"/>
+    <Favorites v-else-if="tab==='favorites'" :key="`favorites-${revision}`"/>
     <Notifications v-else-if="tab==='notifications'" :key="`notices-${revision}`" @unread="n=>unread=n"/>
     <Profile v-else-if="tab==='profile'" :key="`profile-${revision}`" @deleted="bootstrap();tab='discover';revision++"/>
     <Governance v-else-if="tab==='governance'" :key="`governance-${revision}`"/>

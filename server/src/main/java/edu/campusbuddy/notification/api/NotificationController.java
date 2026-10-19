@@ -42,4 +42,19 @@ public class NotificationController {
     identity.requireAdmin(HttpSupport.actor(r));
     return HttpSupport.ok(service.health());
   }
+
+  @GetMapping("/notifications/preferences")
+  public ResponseEntity<Row> preferences(HttpServletRequest r) {
+    UUID actor = HttpSupport.actor(r);
+    identity.check(actor);
+    return HttpSupport.ok(service.preferences(actor));
+  }
+
+  @PutMapping("/notifications/preferences")
+  public ResponseEntity<Row> updatePreferences(
+      HttpServletRequest r, @RequestBody Map<String, Object> b) {
+    UUID actor = HttpSupport.actor(r);
+    identity.check(actor);
+    return HttpSupport.ok(service.updatePreferences(actor, b));
+  }
 }

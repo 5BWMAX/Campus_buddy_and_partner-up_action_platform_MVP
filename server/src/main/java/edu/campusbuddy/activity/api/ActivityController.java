@@ -17,13 +17,31 @@ public class ActivityController {
   }
 
   @GetMapping
-  public ResponseEntity<Row> list(@RequestParam Map<String, Object> query) {
-    return HttpSupport.ok(service.search(query, false));
+  public ResponseEntity<Row> list(HttpServletRequest r, @RequestParam Map<String, Object> query) {
+    return HttpSupport.ok(service.search(HttpSupport.optional(r), query, false));
   }
 
   @PostMapping("/search")
-  public ResponseEntity<Row> search(@RequestBody Map<String, Object> b) {
-    return HttpSupport.ok(service.search(b, true));
+  public ResponseEntity<Row> search(HttpServletRequest r, @RequestBody Map<String, Object> b) {
+    return HttpSupport.ok(service.search(HttpSupport.optional(r), b, true));
+  }
+
+  @GetMapping("/search-history")
+  public ResponseEntity<Row> searchHistory(HttpServletRequest r) {
+    return HttpSupport.ok(service.searchHistory(HttpSupport.actor(r)));
+  }
+
+  @DeleteMapping("/search-history")
+  public ResponseEntity<Row> clearSearchHistory(HttpServletRequest r) {
+    service.clearSearchHistory(HttpSupport.actor(r));
+    return HttpSupport.ok(Row.of("cleared", true));
+  }
+
+  @DeleteMapping("/search-history/{keyword}")
+  public ResponseEntity<Row> deleteSearchHistory(
+      HttpServletRequest r, @PathVariable String keyword) {
+    service.deleteSearchHistory(HttpSupport.actor(r), keyword);
+    return HttpSupport.ok(Row.of("keyword", keyword, "deleted", true));
   }
 
   @GetMapping("/{id}")
@@ -58,5 +76,25 @@ public class ActivityController {
   public ResponseEntity<Row> archive(
       HttpServletRequest r, @PathVariable UUID id, @RequestBody Map<String, Object> b) {
     return HttpSupport.ok(service.archive(HttpSupport.actor(r), id, b));
+  }
+
+  // ===== 活动收藏 =====
+  @PostMapping("/{id}/favorite")
+  public ResponseEntity<Row> favorite(HttpServletRequest r, @PathVariable UUID id) {
+    return HttpSupport.ok(service.favorite(HttpSupport.actor(r), id));
+  }
+
+  @DeleteMapping("/{id}/favorite")
+  public ResponseEntity<Row> unfavorite(HttpServletRequest r, @PathVariable UUID id) {
+    return HttpSupport.ok(service.unfavorite(HttpSupport.actor(r), id));
+  }
+
+  @GetMapping("/favorites/mine")
+  public ResponseEntity<Row> favorites(HttpServletRequest r, @RequestParam Map<String, Object> query) {
+    return HttpSupport.ok(
+        service.favorites(
+            HttpSupport.actor(r),
+            (String) query.getOrDefault("cursor", ""),
+            Cursor.size(query.get("pageSize"))));
   }
 }

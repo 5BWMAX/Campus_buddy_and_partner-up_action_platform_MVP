@@ -64,6 +64,17 @@ public class IdentityRepository {
             + " where id=?",
         id);
     privacy(id, "HIDDEN", "HIDDEN");
+    // V3 user-owned auxiliary data must disappear with the account. Participation,
+    // feedback and governance history stay as anonymised records under the retained id.
+    sql.update("delete from search_history where user_id=?", id);
+    sql.update("delete from activity_favorite where user_id=?", id);
+    sql.update("delete from notification_preference where user_id=?", id);
+    sql.update(
+        "delete from delivery_attempt where task_id in (select id from delivery_task where recipient_id=?)",
+        id);
+    sql.update("delete from delivery_task where recipient_id=?", id);
+    sql.update("delete from notification where recipient_id=?", id);
+    sql.update("delete from idempotency_record where actor_id=?", id);
     sql.update("insert into erasure_log(user_id) values(?) on conflict do nothing", id);
     revokeSessions(id);
   }
