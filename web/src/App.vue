@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, provide, computed } from 'vue'
+import { ref, reactive, onMounted, provide, computed, watch, nextTick } from 'vue'
 import { Compass, CalendarDays, Bell, Heart, UserRound, ShieldCheck, ArrowUpRight, Plus, Sprout, LogOut, Menu, X, Check, CircleAlert } from 'lucide-vue-next'
 import { api, session, refreshSession, login, describeError, favoriteActivity, unfavoriteActivity, type Data } from './api'
 import Discover from './components/Discover.vue'
@@ -11,6 +11,26 @@ import Notifications from './components/Notifications.vue'
 import Profile from './components/Profile.vue'
 import Governance from './components/Governance.vue'
 const tab = ref('discover'), revision = ref(0), accounts = ref<Data[]>([]), loginOpen = ref(false), mobileOpen = ref(false), busy = ref(false)
+const loginDialog=ref<HTMLElement|null>(null)
+let loginTrigger:HTMLElement|null=null
+watch(loginOpen,async open=>{
+ if(open)loginTrigger=document.activeElement instanceof HTMLElement?document.activeElement:null
+ await nextTick()
+ if(open&&loginOpen.value)loginDialog.value?.querySelector<HTMLElement>('button')?.focus()
+ else if(!loginOpen.value){
+  const target=loginTrigger?.isConnected?loginTrigger:document.querySelector<HTMLElement>('.identity')
+  target?.focus()
+ }
+})
+function loginKeydown(event:KeyboardEvent){
+ if(event.key==='Escape'){event.preventDefault();event.stopPropagation();loginOpen.value=false;return}
+ if(event.key!=='Tab')return
+ const controls=Array.from(loginDialog.value?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')||[]).filter(el=>el.getClientRects().length>0)
+ const first=controls[0],last=controls[controls.length-1]
+ if(!first){event.preventDefault();loginDialog.value?.focus();return}
+ if(event.shiftKey&&(document.activeElement===first||document.activeElement===loginDialog.value)){event.preventDefault();last?.focus()}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+}
 const dialog = ref<{id?:string, create?:boolean, edit?:boolean}|null>(null), group = ref<Data|null>(null)
 const alert = ref(''), alertError = ref(false), ready = ref(false), unread = ref(0)
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -44,7 +64,7 @@ const nav=computed(()=>[
 </script>
 <template>
 <div class="app-shell">
- <aside class="sidebar" :class="{expanded:mobileOpen}">
+ <aside class="sidebar" :class="{expanded:mobileOpen}" :inert="loginOpen">
   <a class="brand" href="#" @click.prevent="navigate('discover')"><span class="brand-mark"><Sprout :size="27"/></span><span>同行<span class="brand-small">校园搭子 · 行动平台</span></span></a>
   <button class="mobile-close icon-button" aria-label="关闭导航" @click="mobileOpen=false"><X/></button>
   <div class="campus-label"><span class="dot"></span> 主校区 <span>校园生活，从这里开始</span></div>
@@ -52,7 +72,7 @@ const nav=computed(()=>[
   <div class="sidebar-note"><span class="eyebrow">A LITTLE PLAN, TOGETHER</span><p>小计划，<br>也值得一起完成。</p><span>找一个同频的人，<br>让校园日常多一点可能。</span><ArrowUpRight :size="26"/></div>
   <div class="sidebar-bottom"><span class="demo-tag">本地演示</span><small>虚拟身份 · 模拟外部推送</small></div>
  </aside>
- <div class="main-shell">
+ <div class="main-shell" :inert="loginOpen">
   <header class="topbar"><div class="header-left"><button class="mobile-menu icon-button" aria-label="展开导航" @click="mobileOpen=true"><Menu/></button><span>校园 / <strong>{{nav.find(n=>n.id===tab)?.name}}</strong></span></div><div class="header-actions"><button class="icon-button" aria-label="查看通知" @click="navigate('notifications')"><Bell :size="20"/><i v-if="unread" class="notification-dot"></i></button><button class="identity" @click="loginOpen=true"><span class="avatar">{{session.user?.nickname?.slice(0,1)||'访'}}</span><span>{{session.user?.nickname||'选择演示身份'}}</span></button><button v-if="session.user" class="icon-button" aria-label="退出登录" @click="logout"><LogOut :size="18"/></button></div></header>
   <main id="main-content">
    <div v-if="!ready" class="empty-state"><CircleAlert/><h2>正在连接校园平台</h2><p>如果连接失败，可重试加载。</p><button class="primary" @click="bootstrap">重新连接</button></div>
@@ -68,9 +88,9 @@ const nav=computed(()=>[
   </main>
   <footer>让每一次相约，都有回应。 <span>同行 · 校园搭子与搭伙行动平台</span></footer>
  </div>
- <div v-if="alert" :class="['toast',{error:alertError}]" role="alert"><CircleAlert v-if="alertError" :size="21"/><Check v-else :size="21"/><span>{{alert}}</span><button class="icon-button" aria-label="关闭提示" @click="alert=''"><X :size="18"/></button></div>
- <div v-if="loginOpen" class="modal-backdrop" @click.self="loginOpen=false"><section class="modal login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button class="modal-close icon-button" aria-label="关闭身份选择" @click="loginOpen=false"><X/></button><span class="eyebrow">WELCOME TO TOGETHER</span><h2 id="login-title">以一个身份，开始同行</h2><p class="muted">以下均为虚拟演示账号。切换身份可以体验发起、申请与审核流程。</p><div class="account-list"><button v-for="a in accounts" :key="a.id" :disabled="busy" @click="choose(a.id)"><span class="avatar">{{a.nickname.slice(0,1)}}</span><span><strong>{{a.nickname}}</strong><small>{{a.role==='ADMIN'?'平台管理员':a.verified?'已验证校内身份':'待认证身份'}}{{a.status!=='NORMAL'?' · 已受限':''}}</small></span><ArrowUpRight :size="19"/></button></div></section></div>
- <ActivityDialog v-if="dialog" :options="dialog" @close="dialog=null" @saved="revision++;updateUnread()"/>
- <GroupChat v-if="group" :activity="group" @close="group=null"/>
+ <div v-if="alert" :inert="loginOpen" :class="['toast',{error:alertError}]" role="alert"><CircleAlert v-if="alertError" :size="21"/><Check v-else :size="21"/><span>{{alert}}</span><button class="icon-button" aria-label="关闭提示" @click="alert=''"><X :size="18"/></button></div>
+ <ActivityDialog :inert="loginOpen" v-if="dialog" :options="dialog" @close="dialog=null" @saved="revision++;updateUnread()"/>
+ <GroupChat :inert="loginOpen" v-if="group" :activity="group" @close="group=null"/>
+ <div v-if="loginOpen" class="modal-backdrop" @click.self="loginOpen=false"><section ref="loginDialog" class="modal login-modal" tabindex="-1" @keydown="loginKeydown" role="dialog" aria-modal="true" aria-labelledby="login-title"><button class="modal-close icon-button" aria-label="关闭身份选择" @click="loginOpen=false"><X/></button><span class="eyebrow">WELCOME TO TOGETHER</span><h2 id="login-title">以一个身份，开始同行</h2><p class="muted">以下均为虚拟演示账号。切换身份可以体验发起、申请与审核流程。</p><div class="account-list"><button v-for="a in accounts" :key="a.id" :disabled="busy" @click="choose(a.id)"><span class="avatar">{{a.nickname.slice(0,1)}}</span><span><strong>{{a.nickname}}</strong><small>{{a.role==='ADMIN'?'平台管理员':a.verified?'已验证校内身份':'待认证身份'}}{{a.status!=='NORMAL'?' · 已受限':''}}</small></span><ArrowUpRight :size="19"/></button></div></section></div>
 </div>
 </template>

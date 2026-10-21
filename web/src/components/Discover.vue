@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, inject, onMounted } from 'vue'
+import { ref, reactive, inject, onMounted, onBeforeUnmount } from 'vue'
 import { Search, SlidersHorizontal, MapPin, CalendarDays, Users, ArrowUpRight, Plus, BookOpen, Bike, Sparkles, Compass, Heart, History, X } from 'lucide-vue-next'
 import { api, session, label, date, describeError, getSearchHistory, clearSearchHistory, deleteSearchHistory, type Data } from '../api'
 defineEmits(['publish'])
@@ -8,14 +8,21 @@ const items=ref<Data[]>([]), loading=ref(true), error=ref(''), cursor=ref<string
 const filters=reactive({q:'',type:'',campus:'',tag:'',from:'',to:'',minRemaining:''})
 const geo=ref<{lat:number,lon:number}|null>(null)
 const favorites=inject<{isFavorite:(id:string)=>boolean,toggleFavorite:(id:string)=>Promise<void>,syncFavorites:(items:Data[])=>void}>('favorites')!, searchHistory=ref<Data[]>([]), showHistory=ref(false)
-async function load(more=false){loading.value=true;error.value='';try{
+let requestVersion=0
+onBeforeUnmount(()=>{requestVersion++})
+async function load(more=false){
+ if(more&&(loading.value||!cursor.value))return
+ const version=++requestVersion
+ if(!more)cursor.value=null
+ loading.value=true;error.value='';try{
  const body:Data={sort:sort.value,pageSize:12,...Object.fromEntries(Object.entries(filters).filter(([,v])=>v!==''))}
  for(const k of ['from','to'])if(body[k])body[k]=new Date(body[k]).toISOString()
  if(more&&cursor.value)body.cursor=cursor.value
  if(sort.value==='DISTANCE'){if(!geo.value)throw new Error('请先允许浏览器使用当前位置');Object.assign(body,geo.value,{locationConsent:true})}
  const data=sort.value==='DISTANCE'?await api('/activities/search','POST',body):await api('/activities?'+new URLSearchParams(body).toString())
+ if(version!==requestVersion)return
  items.value=more?[...items.value,...data.items]:data.items;cursor.value=data.nextCursor;if(session.user)favorites.syncFavorites(items.value)
- }catch(e){error.value=describeError(e)}finally{loading.value=false}}
+ }catch(e){if(version===requestVersion)error.value=describeError(e)}finally{if(version===requestVersion)loading.value=false}}
 async function changeSort(){if(sort.value==='DISTANCE'){try{const p=await new Promise<GeolocationPosition>((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:10000}));geo.value={lat:p.coords.latitude,lon:p.coords.longitude}}catch{sort.value='START_TIME';error.value='未获得位置授权，已保留按开始时间排序。';return}}else geo.value=null;await load()}
 function pick(type:string){filters.type=type;load()}
 function state(a:Data){if(a.status!=='OPEN')return label(a.status);if(Date.now()>=new Date(a.deadline).getTime())return '报名截止';return a.remaining<=0?'名额已满':'招募中'}
