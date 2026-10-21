@@ -6,6 +6,7 @@ export class ApiError extends Error {
 }
 const pending = new Map<string, string>()
 export async function api<T = any>(path: string, method = 'GET', body?: unknown, idempotent = false): Promise<T> {
+  if (method !== 'GET' && method !== 'HEAD' && !session.csrf) await refreshSession()
   const signature = `${method}:${path}:${JSON.stringify(body)}`
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (method !== 'GET' && method !== 'HEAD') headers['Content-Type'] = 'application/json'
@@ -20,12 +21,22 @@ export async function api<T = any>(path: string, method = 'GET', body?: unknown,
   let payload: Data
   try { payload = await response.json() }
   catch { throw new ApiError('INVALID_RESPONSE', '服务返回了无法识别的内容，请稍后重试。', '', response.status) }
-  if (!response.ok) throw new ApiError(payload.code || 'REQUEST_FAILED', payload.message || '操作失败', payload.requestId || '', response.status)
+  if (!response.ok) {
+    if (payload.code === 'AUTH_REQUIRED') { session.user = null; session.csrf = ''; pending.clear() }
+    throw new ApiError(payload.code || 'REQUEST_FAILED', payload.message || '操作失败', payload.requestId || '', response.status)
+  }
   if (!Object.hasOwn(payload, 'data')) throw new ApiError('INVALID_RESPONSE', '服务响应缺少数据。', payload.requestId || '', response.status)
   if (idempotent) pending.delete(signature)
   return payload.data as T
 }
-export async function refreshSession() { Object.assign(session, await api('/auth/session')) }
+export async function refreshSession() {
+  try { Object.assign(session, await api('/auth/session')) }
+  catch (e) {
+    // A revoked session is invalidated by the server on its first use.
+    if (!(e instanceof ApiError) || e.code !== 'AUTH_REQUIRED') throw e
+    Object.assign(session, await api('/auth/session'))
+  }
+}
 export async function login(userId: string) { await api('/auth/demo', 'POST', { userId }); await refreshSession() }
 
 // ===== 活动收藏 =====

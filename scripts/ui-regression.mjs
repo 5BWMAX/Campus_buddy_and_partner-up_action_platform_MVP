@@ -28,9 +28,9 @@ try{
  await page.getByRole('button',{name:'全部活动',exact:true}).waitFor();
  await page.locator('.identity').click();
  const dialog=page.locator('.login-modal');
- const close=dialog.getByRole('button',{name:'关闭身份选择'});
+ const close=dialog.getByRole('button',{name:/^关闭(身份选择|登录窗口)$/});
  await close.waitFor();
- await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='关闭身份选择');
+ await page.waitForFunction(()=>['关闭身份选择','关闭登录窗口'].includes(document.activeElement?.getAttribute('aria-label')));
  assert.equal(await page.locator('.main-shell').evaluate(el=>el.inert),true);
  await page.keyboard.press('Shift+Tab');
  assert.equal(await dialog.locator('button').last().evaluate(el=>el===document.activeElement),true,'Shift+Tab must wrap inside the dialog');
