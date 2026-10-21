@@ -78,7 +78,7 @@ pwsh -NoProfile -File .\scripts\start-lan.ps1 -Address 192.168.1.23
 - 举报、受理、处置、申诉、复核、审计；24 小时受理逾期记录及管理员通知。
 - 管理员查看聚合统计并导出 CSV。
 
-默认 `demo` profile 使用虚拟身份和模拟外部推送。站内通知、业务数据、会话、投递任务和审计是真实入库；没有接通学校认证、微信或短信。停用 demo profile 后仍需实现正式适配器才可完成真实登录和推送。
+默认 `demo` profile 使用虚拟身份和模拟外部推送。`formal` profile 提供真实账号注册登录，正常注册用户即可参与，外部推送关闭，站内通知仍可用。两种模式的业务数据、会话和审计均真实入库；没有接通学校认证、微信或短信。
 
 右上角可选择林同学、陈同学、周同学、许同学、待认证同学或平台管理员。演示步骤见 [演示手册](docs/demo.md)。示例活动的时间以首次初始化为准，重启不会重置时间、反馈或数据库；之后演示可正常新建活动。
 
@@ -122,7 +122,7 @@ pwsh -NoProfile -File .\scripts\start-lan.ps1 -Address 192.168.1.23
 4. `deploy/nginx.conf` 使用相对 Nginx prefix 的证书路径（`../localhost.crt`、`../localhost.key`），项目目录变化时不需要改绝对路径。执行 `scripts/enable-db-tls.ps1` 为本机 PostgreSQL 配置证书、reload 并验证连接；这会修改该 PostgreSQL 实例的三个 TLS 设置。
 5. 执行 build、start；烟测需要安装 Playwright 并将 `PLAYWRIGHT_MODULE` 设为实际模块路径，或让 Node 能解析 `playwright`。
 
-Windows 已有环境不必重复运行 setup。Ubuntu 内部演示部署参见[云服务器部署指南](docs/cloud-deployment.md)，包含首次初始化脚本、入口访问保护、备份与回滚；正式身份认证和受信任证书生命周期仍需另行配置。
+Windows 已有环境不必重复运行 setup。Ubuntu 内部演示部署参见[云服务器部署指南](docs/cloud-deployment.md)；从演示站切换到独立数据库的公开注册版本，参见[正式版部署与回滚](docs/formal-deployment.md)。受信任证书生命周期仍需按自己的环境配置。
 
 ## 隐私与提交注意
 
@@ -138,5 +138,6 @@ Windows 已有环境不必重复运行 setup。Ubuntu 内部演示部署参见[�
 - [FR / NFR / T-01～T-26 验收对照](docs/acceptance.md)
 - [课堂演示手册](docs/demo.md)
 - [Ubuntu 云服务器部署与运维](docs/cloud-deployment.md)
-- [正式账号认证后端（界面与上线待完成）](docs/formal-auth.md)
+- [正式账号认证与界面](docs/formal-auth.md)
+- [正式版部署、验收与回滚](docs/formal-deployment.md)
 - [后续优化与集成任务](docs/next-steps.md)
