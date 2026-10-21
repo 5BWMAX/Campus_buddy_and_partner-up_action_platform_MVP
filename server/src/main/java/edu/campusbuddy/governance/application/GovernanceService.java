@@ -87,6 +87,7 @@ public class GovernanceService implements edu.campusbuddy.governance.api.Governa
   @Transactional
   public Row report(UUID actor, Map<String, Object> b) {
     identity.check(actor);
+    identity.lockUserReferences(List.of(actor));
     String type = Input.choice(b, "targetType", "ACTIVITY", "USER", "MESSAGE");
     UUID target = Input.uuid(b.get("targetId"));
     switch (type) {

@@ -104,7 +104,8 @@ public class TeamService implements TeamApi {
         b,
         201,
         () -> {
-          identity.lockUsers(List.of(actor));
+          UUID owner = activities.find(activity).id("ownerId");
+          identity.lockUsersAndReferences(List.of(actor), List.of(owner));
           identity.requireVerified(actor);
           Row a = activities.lockOpen(activity);
           requireGroupNotBlocked(activity);
@@ -200,7 +201,10 @@ public class TeamService implements TeamApi {
   public Row resolve(
       UUID actor, UUID activity, UUID appId, Map<String, Object> b, boolean withdraw) {
     Row pre = repo.application(appId, false);
-    identity.lockUsers(List.of(actor, pre.id("userId")));
+    if (withdraw) {
+      UUID owner = activities.find(activity).id("ownerId");
+      identity.lockUsersAndReferences(List.of(actor, pre.id("userId")), List.of(owner));
+    } else identity.lockUsers(List.of(actor, pre.id("userId")));
     identity.check(actor);
     Row a = activities.lock(activity);
     Row app = repo.application(appId, true);
@@ -232,7 +236,8 @@ public class TeamService implements TeamApi {
         b,
         200,
         () -> {
-          identity.lockUsers(List.of(actor));
+          UUID owner = activities.find(activity).id("ownerId");
+          identity.lockUsersAndReferences(List.of(actor), List.of(owner));
           identity.check(actor);
           Row a = activities.lock(activity);
           Problem.require(
@@ -304,7 +309,9 @@ public class TeamService implements TeamApi {
   @Transactional
   public Row grant(UUID actor, UUID group, boolean write) {
     Row g = repo.groupById(group);
-    Row a = activities.lock(g.id("activityId"));
+    if (write) identity.lockUserReferences(List.of(actor));
+    Row a =
+        write ? activities.lock(g.id("activityId")) : activities.share(g.id("activityId"));
     g = repo.groupById(group);
     try {
       identity.check(actor);
@@ -334,8 +341,23 @@ public class TeamService implements TeamApi {
   }
 
   @Transactional
+  public UUID requireActivityDetailsAccess(UUID actor, UUID activity) {
+    activities.share(activity);
+    try {
+      identity.check(actor);
+    } catch (Problem e) {
+      throw Problem.missing();
+    }
+    Row access = repo.activityDetailsAccess(activity, actor);
+    if (access == null
+        || !access.text("status").equals("ACTIVE")
+        || access.text("accessMode").equals("BLOCKED")) throw Problem.missing();
+    return access.id("groupId");
+  }
+
+  @Transactional
   public List<Row> members(UUID actor, UUID activity) {
-    Row a = activities.lock(activity);
+    Row a = activities.share(activity);
     try {
       identity.check(actor);
     } catch (Problem e) {
@@ -346,13 +368,18 @@ public class TeamService implements TeamApi {
     if (p == null
         || !p.text("status").equals("ACTIVE")
         || (g != null && g.text("accessMode").equals("BLOCKED"))) throw Problem.missing();
-    return repo.active(activity).stream()
+    List<Row> participations = repo.activeParticipations(activity);
+    Map<UUID, Row> profiles =
+        identity.memberProfiles(participations.stream().map(x -> x.id("userId")).toList());
+    return participations.stream()
         .map(
-            u -> {
-              Row out = identity.memberProfile(u);
+            participation -> {
+              Row profile = profiles.get(participation.id("userId"));
+              if (profile == null) throw Problem.missing();
+              Row out = new Row(profile);
               out.putAll(
-                  repo.participation(activity, u)
-                      .only("role", "confirmation", "version", "checkinStatus", "checkinAt"));
+                  participation.only(
+                      "role", "confirmation", "version", "checkinStatus", "checkinAt"));
               return out;
             })
         .toList();

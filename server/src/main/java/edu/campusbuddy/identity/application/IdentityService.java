@@ -42,7 +42,31 @@ public class IdentityService implements IdentityApi {
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void lockUsers(Collection<UUID> ids) {
-    ids.stream().distinct().sorted(Comparator.comparing(UUID::toString)).forEach(repo::lock);
+    lockUsersAndReferencesInOrder(ids, List.of());
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockUserReferences(Collection<UUID> referenceIds) {
+    lockUsersAndReferencesInOrder(List.of(), referenceIds);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockUsersAndReferences(
+      Collection<UUID> updateIds, Collection<UUID> referenceOnlyIds) {
+    lockUsersAndReferencesInOrder(updateIds, referenceOnlyIds);
+  }
+
+  private void lockUsersAndReferencesInOrder(
+      Collection<UUID> updateIds, Collection<UUID> referenceOnlyIds) {
+    Set<UUID> updates = new HashSet<>(updateIds);
+    Set<UUID> all = new HashSet<>(updates);
+    all.addAll(referenceOnlyIds);
+    all.stream()
+        .sorted(Comparator.comparing(UUID::toString))
+        .forEach(id -> {
+          if (updates.contains(id)) repo.lock(id);
+          else repo.lockReference(id);
+        });
   }
 
   public List<UUID> administrators() {
@@ -72,7 +96,24 @@ public class IdentityService implements IdentityApi {
   }
 
   public Row memberProfile(UUID id) {
-    Row u = repo.user(id);
+    return memberProfile(repo.user(id));
+  }
+
+  public Map<UUID, Row> memberProfiles(Collection<UUID> ids) {
+    List<UUID> ordered = ids.stream().distinct().toList();
+    if (ordered.isEmpty()) return Map.of();
+    Map<UUID, Row> users = new HashMap<>();
+    repo.users(ordered).forEach(u -> users.put(u.id("id"), u));
+    Map<UUID, Row> profiles = new LinkedHashMap<>();
+    for (UUID id : ordered) {
+      Row user = users.get(id);
+      if (user == null) throw Problem.missing();
+      profiles.put(id, memberProfile(user));
+    }
+    return profiles;
+  }
+
+  private Row memberProfile(Row u) {
     Row out = u.only("id", "nickname", "avatarUrl", "department");
     if (u.text("status").equals("NORMAL") && u.text("contactVisibility").equals("GROUP"))
       out.put("contact", crypto.decrypt(u.text("contactCiphertext")));
