@@ -12,10 +12,14 @@ if (Test-Path -LiteralPath $configFile) {$config=Get-Content -Raw -LiteralPath $
  $config | ConvertTo-Json | Set-Content -LiteralPath $configFile -Encoding utf8
  $config=[pscustomobject]$config
 }
+if (-not $config.PSObject.Properties['TEST_AUTH_DB_URL']) {
+ $config | Add-Member -NotePropertyName TEST_AUTH_DB_URL -NotePropertyValue 'jdbc:postgresql://localhost:5432/campus_buddy_auth_test'
+ $config | ConvertTo-Json | Set-Content -LiteralPath $configFile -Encoding utf8
+}
 if (-not $AdminPassword) {$secure=Read-Host 'PostgreSQL postgres password' -AsSecureString;$AdminPassword=[System.Net.NetworkCredential]::new('',$secure).Password}
 $env:PGPASSWORD=$AdminPassword
 try {
- foreach($entry in @(@{User=$config.DB_USER;Password=$config.DB_PASSWORD;Db='campus_buddy_mvp2'},@{User=$config.TEST_DB_USER;Password=$config.TEST_DB_PASSWORD;Db='campus_buddy_mvp2_test'},@{User=$config.TEST_DB_USER;Password=$config.TEST_DB_PASSWORD;Db='campus_buddy_mvp2_restore'})) {
+ foreach($entry in @(@{User=$config.DB_USER;Password=$config.DB_PASSWORD;Db='campus_buddy_mvp2'},@{User=$config.TEST_DB_USER;Password=$config.TEST_DB_PASSWORD;Db='campus_buddy_mvp2_test'},@{User=$config.TEST_DB_USER;Password=$config.TEST_DB_PASSWORD;Db='campus_buddy_auth_test'},@{User=$config.TEST_DB_USER;Password=$config.TEST_DB_PASSWORD;Db='campus_buddy_mvp2_restore'})) {
  $role=$entry.User;$db=$entry.Db;$password=$entry.Password
  $exists=& "$PgBin\psql.exe" -h localhost -p 5432 -U postgres -d postgres -Atc "select 1 from pg_roles where rolname='$role'"
  if($LASTEXITCODE -ne 0){throw 'PostgreSQL authentication failed'}
@@ -42,6 +46,6 @@ if(-not (Test-Path -LiteralPath "$projectRoot\.local\localhost.key")) {
   [System.IO.File]::WriteAllText("$projectRoot\.local\localhost.key",$rsa.ExportPkcs8PrivateKeyPem())
  } finally {$certificate.Dispose()}
 }
-Write-Output 'Dedicated demo/test/restore databases and local HTTPS certificate are ready.'
+Write-Output 'Dedicated demo/test/formal-auth-test/restore databases and local HTTPS certificate are ready.'
 # Generate the local Spring config consumed by an IDE run; it is ignored by Git.
 & "$PSScriptRoot/make-local-config.ps1" | Out-Null

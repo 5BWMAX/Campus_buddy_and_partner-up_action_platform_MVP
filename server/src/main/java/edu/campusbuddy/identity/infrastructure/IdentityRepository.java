@@ -73,6 +73,7 @@ public class IdentityRepository {
   }
 
   public void erase(UUID id) {
+    sql.update("delete from account_credential where user_id=?", id);
     sql.update(
         "update user_account set"
             + " status='DELETED',campus_subject=null,nickname='已注销用户',avatar_url=null,department=null,contact_ciphertext=null,verified=false"
@@ -98,6 +99,10 @@ public class IdentityRepository {
     return sql.list("select id from user_account where role='ADMIN' and status='NORMAL'").stream()
         .map(r -> r.id("id"))
         .toList();
+  }
+
+  public Row credentialState(UUID id) {
+    return sql.one("select c.username,c.password_change_required from account_credential c join user_account u on u.id=c.user_id where c.user_id=? and u.demo=false and u.status<>'DELETED'", id);
   }
 
   public List<Row> demoUsers() {

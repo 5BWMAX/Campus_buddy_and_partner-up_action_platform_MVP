@@ -138,4 +138,5 @@ Windows 已有环境不必重复运行 setup。Ubuntu 内部演示部署参见[�
 - [FR / NFR / T-01～T-26 验收对照](docs/acceptance.md)
 - [课堂演示手册](docs/demo.md)
 - [Ubuntu 云服务器部署与运维](docs/cloud-deployment.md)
+- [正式账号认证后端（界面与上线待完成）](docs/formal-auth.md)
 - [后续优化与集成任务](docs/next-steps.md)

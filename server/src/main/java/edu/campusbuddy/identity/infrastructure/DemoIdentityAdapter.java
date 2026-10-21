@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("demo")
+@Profile("demo & !formal")
 public class DemoIdentityAdapter implements IdentityAdapter {
   private final IdentityRepository repo;
 

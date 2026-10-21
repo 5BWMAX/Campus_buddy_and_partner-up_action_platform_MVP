@@ -13,17 +13,20 @@ public class TaskScheduler {
   private final DeliveryWorker worker;
   private final edu.campusbuddy.governance.api.GovernanceApi governance;
   private final boolean enabled;
+  private final boolean externalPushEnabled;
   private final Logger log = LoggerFactory.getLogger(getClass());
 
   public TaskScheduler(
       ActivityApi a,
       DeliveryWorker w,
       edu.campusbuddy.governance.api.GovernanceApi g,
-      @Value("${campus.scheduler-enabled:true}") boolean e) {
+      @Value("${campus.scheduler-enabled:true}") boolean e,
+      @Value("${campus.external-push-enabled:true}") boolean externalPushEnabled) {
     activity = a;
     governance = g;
     worker = w;
     enabled = e;
+    this.externalPushEnabled = externalPushEnabled;
   }
 
   @Scheduled(fixedDelay = 5000)
@@ -49,7 +52,7 @@ public class TaskScheduler {
 
   @Scheduled(fixedDelay = 5000)
   public void deliver() {
-    if (!enabled) return;
+    if (!enabled || !externalPushEnabled) return;
     try {
       long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
       for (int batch = 0; batch < 100 && System.nanoTime() < until; batch++)

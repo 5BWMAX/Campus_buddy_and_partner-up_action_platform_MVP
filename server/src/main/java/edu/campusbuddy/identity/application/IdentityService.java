@@ -11,14 +11,17 @@ import org.springframework.transaction.annotation.*;
 public class IdentityService implements IdentityApi {
   private final IdentityRepository repo;
   private final Crypto crypto;
+  private final AuthMode authMode;
   private final edu.campusbuddy.activity.api.ActivityApi activities;
 
   public IdentityService(
       IdentityRepository r,
       Crypto c,
+      AuthMode mode,
       @org.springframework.context.annotation.Lazy edu.campusbuddy.activity.api.ActivityApi a) {
     repo = r;
     crypto = c;
+    authMode = mode;
     activities = a;
   }
 
@@ -32,6 +35,12 @@ public class IdentityService implements IdentityApi {
 
   public UserGrant requireVerified(UUID id) {
     UserGrant u = check(id);
+    if (authMode.formal()) {
+      Row credential = repo.credentialState(id);
+      Problem.require(credential != null, 403, "IDENTITY_REQUIRED", "需要正式注册账号");
+      Problem.require(!credential.bool("passwordChangeRequired"), 403, "PASSWORD_CHANGE_REQUIRED", "请先修改临时密码");
+      return u;
+    }
     Problem.require(u.verified(), 403, "IDENTITY_REQUIRED", "需要已验证的校内身份");
     return u;
   }
@@ -92,6 +101,10 @@ public class IdentityService implements IdentityApi {
             "locationVisibility");
     if (!u.text("status").equals("DELETED"))
       out.put("contact", crypto.decrypt(u.text("contactCiphertext")));
+    if (authMode.formal()) {
+      Row credential = repo.credentialState(id);
+      if (credential != null) out.putAll(credential.only("username", "passwordChangeRequired"));
+    }
     return out;
   }
 

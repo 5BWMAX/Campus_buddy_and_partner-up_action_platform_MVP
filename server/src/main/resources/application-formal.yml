@@ -1,0 +1,13 @@
+server:
+  forward-headers-strategy: none
+  servlet:
+    session:
+      cookie:
+        name: CAMPUS_SESSION
+campus:
+  seed-enabled: false
+  # Formal accounts use in-app notifications; no real external push adapter is configured.
+  external-push-enabled: false
+  auth:
+    # Enable only with a loopback proxy which overwrites X-Forwarded-For.
+    trust-loopback-proxy: false

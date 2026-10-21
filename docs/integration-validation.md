@@ -35,6 +35,7 @@
 
 先按项目运行说明配置本地环境，启动数据库。集成测试只使用独立的
 `campus_buddy_mvp2_test` 数据库，现有并发测试还校验服务实际位于回环地址的 5432 端口。
+正式认证测试另需独立 `campus_buddy_auth_test` 和 `TEST_AUTH_DB_URL`，使用相同测试角色；配置步骤见[正式认证后端说明](formal-auth.md#独立测试数据库)。
 不要把测试连接配置为演示或生产数据库。
 
 ```powershell

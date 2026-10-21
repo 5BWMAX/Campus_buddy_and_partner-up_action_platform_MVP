@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@Profile("demo")
+@Profile("demo & !formal")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
     name = "campus.seed-enabled",
     havingValue = "true",
