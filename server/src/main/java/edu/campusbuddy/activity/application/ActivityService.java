@@ -17,33 +17,39 @@ import org.springframework.transaction.annotation.*;
 @Service
 public class ActivityService implements ActivityApi {
   private final ActivityRepository repo;
+  private final SearchHistoryRepository searchHistory;
   private final IdentityApi identity;
   private final TeamApi team;
   private final NotificationApi notices;
   private final Clock clock;
   private final Crypto crypto;
   private final Idempotency idem;
+  private final Cursor cursor;
   private final Map<String, ActivitySort> sorts = new HashMap<>();
   private final int remind, pending;
 
   public ActivityService(
       ActivityRepository r,
+      SearchHistoryRepository sh,
       IdentityApi i,
       @Lazy TeamApi t,
       NotificationApi n,
       Clock c,
       Crypto x,
       Idempotency d,
+      Cursor cur,
       List<ActivitySort> options,
       @Value("${campus.reminder-minutes:30}") int rm,
       @Value("${campus.pending-reminder-minutes:10}") int pm) {
     repo = r;
+    searchHistory = sh;
     identity = i;
     team = t;
     notices = n;
     clock = c;
     crypto = x;
     idem = d;
+    cursor = cur;
     options.forEach(s -> sorts.put(s.name(), s));
     remind = rm;
     pending = pm;
@@ -59,16 +65,60 @@ public class ActivityService implements ActivityApi {
   }
 
   @Transactional(propagation = Propagation.MANDATORY)
+  public Row share(UUID id) {
+    return repo.share(id);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
   public Row lockOpen(UUID id) {
     Row a = repo.lock(id);
     ActivityRules.open(a, clock.instant());
     return a;
   }
 
-  public Row search(Map<String, Object> b, boolean location) {
+  public Row search(UUID actor, Map<String, Object> b, boolean location) {
     String sort = String.valueOf(b.getOrDefault("sort", "START_TIME"));
     Problem.require(sorts.containsKey(sort), 400, "VALIDATION_FAILED", "排序方式不合法");
-    return repo.discovery(b, sort, sorts.get(sort).column(), location);
+    // 保存搜索历史
+    if (actor != null) {
+      String q = b.get("q") == null ? "" : String.valueOf(b.get("q")).trim();
+      if (!q.isEmpty()) {
+        try {
+          searchHistory.save(actor, q);
+        } catch (Exception ignored) {
+          // 搜索历史保存失败不影响搜索结果
+        }
+      }
+    }
+    Row page = repo.discovery(b, sort, sorts.get(sort).column(), location);
+    annotateFavorites(actor, page);
+    return page;
+  }
+
+  private void annotateFavorites(UUID actor, Row page) {
+    Set<UUID> favorited = actor == null ? Set.of() : repo.favoriteIds(actor);
+    if (page.get("items") instanceof List<?> items) {
+      for (Object o : items) {
+        if (o instanceof Row r) r.put("favorited", favorited.contains(r.id("id")));
+      }
+    }
+  }
+
+  public List<Row> searchHistory(UUID actor) {
+    identity.check(actor);
+    return searchHistory.list(actor, 20);
+  }
+
+  @Transactional
+  public void clearSearchHistory(UUID actor) {
+    identity.check(actor);
+    searchHistory.clear(actor);
+  }
+
+  @Transactional
+  public void deleteSearchHistory(UUID actor, String keyword) {
+    identity.check(actor);
+    searchHistory.delete(actor, keyword);
   }
 
   public Row details(UUID actor, UUID id) {
@@ -97,11 +147,10 @@ public class ActivityService implements ActivityApi {
             "publicLon");
     out.put("occupied", team.occupied(id));
     out.put("remaining", a.num("capacity") - team.occupied(id));
-    Row g = team.group(id);
     if (actor != null) {
       try {
-        team.members(actor, id);
-        if (g != null) out.put("groupId", g.get("id"));
+        UUID group = team.requireActivityDetailsAccess(actor, id);
+        if (group != null) out.put("groupId", group);
         Row owner = identity.profile(a.id("ownerId"));
         if (owner.text("locationVisibility").equals("GROUP") || actor.equals(a.id("ownerId")))
           out.put("exactLocation", crypto.decrypt(a.text("exactLocationCiphertext")));
@@ -109,6 +158,7 @@ public class ActivityService implements ActivityApi {
         if (denied.status != 404 && denied.status != 403) throw denied;
       }
     }
+    out.put("favorited", actor != null && repo.isFavorited(actor, id));
     return out;
   }
 
@@ -157,7 +207,10 @@ public class ActivityService implements ActivityApi {
         () -> {
           identity.lockUsers(List.of(actor));
           identity.requireVerified(actor);
-          Row a = fields(b);
+          // The encrypted column is server-owned: never accept a client-supplied ciphertext.
+          Row input = new Row(b);
+          input.remove("exactLocationCiphertext");
+          Row a = fields(input);
           ActivityRules.validate(a, clock.instant());
           team.requireNoConflict(actor, a.time("startAt"), a.time("endAt"), null);
           UUID id = UUID.randomUUID();
@@ -229,7 +282,9 @@ public class ActivityService implements ActivityApi {
     Problem.version(old.num("version"), Input.number(b, "expectedVersion", 0, Long.MAX_VALUE));
     ActivityRules.editable(old, clock.instant());
     Row merged = new Row(old);
-    merged.putAll(b);
+    b.forEach((k, v) -> {
+      if (!k.equals("exactLocationCiphertext")) merged.put(k, v);
+    });
     Row a = fields(merged);
     a.put("id", id);
     a.put("ownerId", actor);
@@ -404,5 +459,40 @@ public class ActivityService implements ActivityApi {
   @Transactional(propagation = Propagation.MANDATORY)
   public void scrubOwner(UUID id) {
     repo.scrub(id);
+  }
+
+  // ===== 活动收藏 =====
+  @Transactional
+  public Row favorite(UUID actor, UUID activityId) {
+    identity.check(actor);
+    Row a = repo.find(activityId);
+    if (a.text("visibility").equals("HIDDEN")) throw Problem.missing();
+    repo.addFavorite(actor, activityId);
+    return Row.of("activityId", activityId, "favorited", true, "count", repo.favoriteCount(activityId));
+  }
+
+  @Transactional
+  public Row unfavorite(UUID actor, UUID activityId) {
+    identity.check(actor);
+    repo.removeFavorite(actor, activityId);
+    return Row.of("activityId", activityId, "favorited", false, "count", repo.favoriteCount(activityId));
+  }
+
+  public Row favorites(UUID actor, String token, int size) {
+    identity.check(actor);
+    String context = "favorites:" + actor;
+    Row pos = cursor.decode(token, context);
+    List<Row> items =
+        repo.favorites(
+            actor,
+            pos == null ? null : pos.time("at"),
+            pos == null ? null : pos.id("id"),
+            size + 1);
+    return cursor.page(items, size, context, "favoritedAt");
+  }
+
+  public boolean isFavorited(UUID actor, UUID activityId) {
+    if (actor == null) return false;
+    return repo.isFavorited(actor, activityId);
   }
 }

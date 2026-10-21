@@ -27,6 +27,8 @@ public interface TeamApi {
 
   Row grant(UUID actor, UUID group, boolean write);
 
+  UUID requireActivityDetailsAccess(UUID actor, UUID activity);
+
   Row group(UUID activity);
 
   List<Row> members(UUID actor, UUID activity);

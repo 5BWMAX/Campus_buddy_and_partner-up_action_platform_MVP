@@ -25,6 +25,10 @@ public class ActivityRepository {
     return sql.must("select * from activity where id=? for update", id);
   }
 
+  public Row share(UUID id) {
+    return sql.must("select * from activity where id=? for share", id);
+  }
+
   public void create(Row a) {
     sql.update(
         "insert into"
@@ -219,5 +223,51 @@ public class ActivityRepository {
     } catch (NumberFormatException e) {
       throw new Problem(400, "VALIDATION_FAILED", "坐标范围不合法");
     }
+  }
+
+  // ===== 活动收藏 =====
+  public Set<UUID> favoriteIds(UUID userId) {
+    Set<UUID> ids = new HashSet<>();
+    for (Row r : sql.list("select activity_id from activity_favorite where user_id=?", userId))
+      ids.add(r.id("activityId"));
+    return ids;
+  }
+
+  public boolean isFavorited(UUID userId, UUID activityId) {
+    return sql.count(
+            "select count(*) from activity_favorite where user_id=? and activity_id=?",
+            userId,
+            activityId)
+        > 0;
+  }
+
+  public void addFavorite(UUID userId, UUID activityId) {
+    sql.update(
+        "insert into activity_favorite(user_id, activity_id) values(?, ?) on conflict do nothing",
+        userId,
+        activityId);
+  }
+
+  public void removeFavorite(UUID userId, UUID activityId) {
+    sql.update(
+        "delete from activity_favorite where user_id=? and activity_id=?", userId, activityId);
+  }
+
+  public List<Row> favorites(UUID userId, Instant before, UUID last, int limit) {
+    return sql.list(
+        "select a.id,a.owner_id,a.title,a.type,a.description,a.campus,a.tags,a.start_at,a.end_at,a.deadline,a.capacity,a.status,a.terminal_state,a.version,a.public_location,a.public_lat,a.public_lon,u.nickname as owner_name,coalesce(p.n,0) as occupied,a.capacity-coalesce(p.n,0) as remaining,f.created_at as favorited_at"
+            + " from activity_favorite f join activity a on a.id=f.activity_id join user_account u on u.id=a.owner_id"
+            + " left join (select activity_id,count(*) n from participation where status='ACTIVE' group by activity_id) p on p.activity_id=a.id"
+            + " where f.user_id=? and a.visibility='VISIBLE'"
+            + (before == null ? "" : " and (f.created_at,f.activity_id)<(?,?)")
+            + " order by f.created_at desc,f.activity_id desc limit ?",
+        before == null
+            ? new Object[] {userId, limit}
+            : new Object[] {userId, before, last, limit});
+  }
+
+  public long favoriteCount(UUID activityId) {
+    return sql.count(
+        "select count(*) from activity_favorite where activity_id=?", activityId);
   }
 }

@@ -61,28 +61,29 @@ class RetryDiscoveryTest extends PgIntegrationSupport {
   @Test
   void discoveryFiltersPaginationAndLocationConsentAreValidated() {
     for (int i = 0; i < 3; i++) activity(ALICE, 2, 7200 + i * 7200, 10800 + i * 7200);
-    Row first = activities.search(Row.of("type", "STUDY", "pageSize", 1), false);
+    Row first = activities.search(null, Row.of("type", "STUDY", "pageSize", 1), false);
     assertEquals(1, ((List<?>) first.get("items")).size());
     String token = first.text("nextCursor");
     assertFalse(token.isBlank());
-    Row next = activities.search(Row.of("type", "STUDY", "pageSize", 1, "cursor", token), false);
+    Row next = activities.search(null, Row.of("type", "STUDY", "pageSize", 1, "cursor", token), false);
     assertNotEquals(json.write(first.get("items")), json.write(next.get("items")));
     problem(
-        "CURSOR_INVALID", () -> activities.search(Row.of("type", "SPORT", "cursor", token), false));
+        "CURSOR_INVALID", () -> activities.search(null, Row.of("type", "SPORT", "cursor", token), false));
     problem(
         "LOCATION_PERMISSION_REQUIRED",
-        () -> activities.search(Row.of("sort", "DISTANCE", "lat", 31.2, "lon", 121.4), true));
+        () -> activities.search(null, Row.of("sort", "DISTANCE", "lat", 31.2, "lon", 121.4), true));
     assertEquals(
         3,
         ((List<?>)
                 activities
                     .search(
+                        null,
                         Row.of(
                             "sort", "DISTANCE", "locationConsent", true, "lat", 31.2, "lon", 121.4),
                         true)
                     .get("items"))
             .size());
-    assertTrue(((List<?>) activities.search(Row.of("tag", "不存在"), false).get("items")).isEmpty());
+    assertTrue(((List<?>) activities.search(null, Row.of("tag", "不存在"), false).get("items")).isEmpty());
   }
 
   @Test

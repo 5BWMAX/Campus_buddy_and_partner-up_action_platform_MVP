@@ -42,6 +42,7 @@ flowchart LR
 - 时间冲突采用 `[startAt, endAt)`，前一活动结束等于后一活动开始允许参与。锁按参与者顺序取得，并在锁内重读活动、申请和参与状态；关键瞬时数据库错误重试整个事务，耗尽返回 503。
 - 批准、参与、建群、站内通知、发送任务和幂等记录在同一数据库事务提交。异常时整体回滚；唯一约束保证一个活动至多一个临时群。
 - 请假仍为 ACTIVE，保留名额；退出/移除释放名额并收回群读写权限。发起人需要取消活动，不能单独退出。重新申请产生新的 round，保留历史并复用已有群。
+- 治理解散小组将 access_mode 设为 BLOCKED，并阻止新的申请/批准；撤销解散时若活动仍在进行则恢复 ACTIVE，否则保持 READ_ONLY。解散/恢复都会通知受影响成员。
 - 活动变更需要 expectedVersion；重大时间变更重新检查现有成员冲突，失败则整体拒绝，不自动移除成员。重大变更重置确认并通知受影响者。
 - 报名门禁实时判断 `now < deadline`，无需等待每 5 秒的扫描；到期任务使申请过期并保留通知与历史。待审核提醒提前 10 分钟，开始提醒提前 30 分钟；不为在提醒时间之后新建的活动补发该次提前提醒。
 - 结束时记录不可变成员快照，含 OWNER。退出与结束的竞争以事务提交次序确定结果。正常结束的反馈窗口为 `[endedAt, endedAt + 24h)`；每人一次，评价目标必须同一快照。取消后的活动不产生正常完成反馈资格。
@@ -57,9 +58,11 @@ flowchart LR
 
 ## 数据与安全
 
-Flyway 迁移：`V1__baseline.sql`（基础业务及会话表）、`V2__governance_sla.sql`（持久化受理逾期事件）。数据库是事实来源，名额、幂等、任务和快照均不只存在于内存。
+Flyway 迁移：`V1__baseline.sql`（基础业务及会话表）、`V2__governance_sla.sql`（持久化受理逾期事件）、`V3__new_features.sql`（收藏、撤回、图片、搜索历史、通知偏好、media_file）、`V4__notification_preference_pending_reminder.sql`（拆出待审核提醒偏好）。数据库是事实来源，名额、幂等、任务和快照均不只存在于内存。
 
-Session Cookie 使用 Secure、HttpOnly、SameSite=Lax。写请求使用 JSON 和 CSRF token；应用和代理限制请求体 64 KiB。对象权限在后端重新校验，非群成员请求采用通用 404。应用有本机进程内的写入限流，尚未验证分布式限流。
+V3 的图片消息使用 multipart 上传：文件上限 5 MiB，控制器校验实际文件签名并写入 `media_file`；聊天消息只能引用上传者本人的图片。JSON 业务写请求仍限制 64 KiB，multipart 上传是唯一例外；Nginx 与 Spring multipart 各自配置了 6 MiB 请求上限。撤回会在服务端清空正文和媒体引用，查询层同时对历史撤回记录做空值保护。
+
+Session Cookie 使用 Secure、HttpOnly、SameSite=Lax。写请求使用 JSON 和 CSRF token。对象权限在后端重新校验，非群成员请求采用通用 404。应用有本机进程内的写入限流，尚未验证分布式限流。
 
 联系方式和精确集合点使用 AES-GCM 密文存储；默认不分享，只有用户选择 GROUP 且请求者具备当前群资格才可返回。公开地点与精确集合点分开处理。日志记录 requestId、路径、结果和耗时，不主动记录请求正文、联系方式、精确位置或认证凭据。
 
@@ -72,9 +75,10 @@ Session Cookie 使用 Secure、HttpOnly、SameSite=Lax。写请求使用 JSON �
 ## 本地运行注意事项
 
 - 默认模式下 Nginx 与应用只监听回环。本地自签证书有效期以 `.local/localhost.p12` 实际内容为准，尚无自动续期。局域网演示模式见本节末尾。
-- PostgreSQL TLS 配置通过 `ALTER SYSTEM` 和 reload 应用到当前本机实例，原非 TLS 连接方式仍可使用；本项目应用和烟测选用 verify-full。没有停用或重建用户既有数据库。
+- IDEA 直接运行主类时不会加载 `scripts/env.ps1`。`application.yml` 以 optional 方式导入 `.local/application-local.yml`（项目根或 `server` 工作目录两种路径），该文件由 `scripts/make-local-config.ps1` 从 `.local/settings.json` 生成，包含数据库密码、加密密钥和 TLS 密码，已被 Git 忽略；不要提交。
+- PostgreSQL TLS 配置通过 `ALTER SYSTEM` 和 reload 应用到当前本机实例，原非 TLS 连接方式仍可使用；启用时本项目应用和烟测选用 verify-full。当前复跑实例未启用 SSL，烟测记录 `pg_stat_ssl=f`，因此数据库段 TLS 不计入本轮验证。没有停用或重建用户既有数据库。
 - 原设置在 `.local/pg-tls-before.json`。`pwsh -File .\scripts\enable-db-tls.ps1 -Restore` 只恢复 PostgreSQL 的 ssl、ssl_cert_file、ssl_key_file，并不会同时恢复项目 settings.json 中的客户端连接参数。
-- 如确需回滚为原非 TLS 本地方案，应先停止本项目，在当前 shell 临时移除 PGSSLMODE/PGSSLROOTCERT 的连接强制参数，再执行 Restore；随后将 settings.json 的 DB_URL/TEST_DB_URL 改回原本地 JDBC URL，移除 PGSSLMODE/PGSSLROOTCERT 配置，并新开终端。回滚后不能再把连接算作全链路 TLS，当前严格烟测也会拒绝该环境。不要在正常演示前主动回滚。
+- 如确需回滚为原非 TLS 本地方案，应先停止本项目，在当前 shell 临时移除 PGSSLMODE/PGSSLROOTCERT 的连接强制参数，再执行 Restore；随后将 settings.json 的 DB_URL/TEST_DB_URL 改回原本地 JDBC URL，移除 PGSSLMODE/PGSSLROOTCERT 配置，并新开终端。回滚后不能再把连接算作全链路 TLS；烟测会记录实际 `pg_stat_ssl`，在配置 `PGSSLMODE=verify-full` 时才强制要求 TLS。不要在正常演示前主动回滚。
 - `.local/run` 是运行副本，构建新的 target JAR 后需要 stop/start 才切换运行版本。重启保留数据库和所有演示记录。
 - 局域网演示模式（`scripts/start-lan.ps1`）把 Nginx 的对外监听改为本机某个局域网地址，并签发含该 IP 的独立证书 `.local/lan.crt` / `lan.key`；应用仍只监听 `127.0.0.1:8443`，因此默认模式下「应用与代理仅监听回环」的结论继续成立，局域网模式下仅代理入口对本机所在子网可见。后端证书校验对象不变，Nginx 仍信任 `.local/localhost.crt`。
 - `.local/nginx-lan.conf` 由 `deploy/nginx.conf` 做精确替换生成，每处匹配数不为 1 时脚本报错退出、不生成配置；模式切换不改动 `application.yml`、`deploy/nginx.conf` 与既有脚本。

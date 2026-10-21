@@ -24,6 +24,13 @@ public class TeamRepository {
         .toList();
   }
 
+  public List<Row> activeParticipations(UUID activity) {
+    return sql.list(
+        "select user_id,role,confirmation,version,checkin_status,checkin_at from participation"
+            + " where activity_id=? and status='ACTIVE' order by user_id",
+        activity);
+  }
+
   public long occupied(UUID activity) {
     return sql.count(
         "select count(*) from participation where activity_id=? and status='ACTIVE'", activity);
@@ -97,6 +104,15 @@ public class TeamRepository {
 
   public Row participation(UUID activity, UUID user) {
     return sql.one("select * from participation where activity_id=? and user_id=?", activity, user);
+  }
+
+  public Row activityDetailsAccess(UUID activity, UUID user) {
+    return sql.one(
+        "select p.status,g.id as group_id,g.access_mode from participation p left join"
+            + " temporary_group g on g.activity_id=p.activity_id where p.activity_id=? and"
+            + " p.user_id=?",
+        activity,
+        user);
   }
 
   public Row activate(UUID activity, UUID user, String role) {
@@ -178,10 +194,10 @@ public class TeamRepository {
         activity);
   }
 
-  public void block(UUID activity, boolean value) {
+  public void accessMode(UUID activity, String mode) {
     sql.update(
         "update temporary_group set access_mode=?,version=version+1 where activity_id=?",
-        value ? "BLOCKED" : "READ_ONLY",
+        mode,
         activity);
   }
 

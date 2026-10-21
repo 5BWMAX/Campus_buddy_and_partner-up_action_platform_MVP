@@ -87,6 +87,7 @@ public class GovernanceService implements edu.campusbuddy.governance.api.Governa
   @Transactional
   public Row report(UUID actor, Map<String, Object> b) {
     identity.check(actor);
+    identity.lockUserReferences(List.of(actor));
     String type = Input.choice(b, "targetType", "ACTIVITY", "USER", "MESSAGE");
     UUID target = Input.uuid(b.get("targetId"));
     switch (type) {
@@ -223,7 +224,18 @@ public class GovernanceService implements edu.campusbuddy.governance.api.Governa
         if (action.equals("HIDE_ACTIVITY")) activities.hide(actor, activity, true, reason);
         else if (action.equals("CANCEL_ACTIVITY"))
           activities.cancelByGovernance(actor, activity, reason);
-        else team.block(activity, true);
+        else {
+          Problem.require(
+              team.group(activity) != null, 409, "GROUP_NOT_FOUND", "活动尚未形成临时小组");
+          team.block(activity, true);
+          for (UUID member : team.affected(activity))
+            notices.record(
+                member,
+                activity,
+                "GROUP_DISSOLVED",
+                activity + ":group-dissolved:" + member,
+                Row.of("message", "临时小组已被治理解散，仅可查看历史消息"));
+        }
       }
       case "DISABLE_USER" -> {
         Problem.require(
@@ -321,7 +333,16 @@ public class GovernanceService implements edu.campusbuddy.governance.api.Governa
         switch (dec.text("action")) {
           case "DISABLE_USER" -> identity.disable(user, false);
           case "HIDE_ACTIVITY" -> activities.hide(actor, activity, false, reason);
-          case "DISSOLVE_GROUP" -> team.block(activity, false);
+          case "DISSOLVE_GROUP" -> {
+            team.block(activity, false);
+            for (UUID member : team.affected(activity))
+              notices.record(
+                  member,
+                  activity,
+                  "GROUP_RESTORED",
+                  activity + ":group-restored:" + member,
+                  Row.of("message", "治理处置已撤销，临时小组恢复可用"));
+          }
           case "REMOVE_MEMBER" -> team.restoreRemoved(activity, user);
           case "HIDE_MESSAGE" -> chat.hide(r.id("targetId"), false);
           default -> {}

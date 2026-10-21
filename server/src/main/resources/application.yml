@@ -14,6 +14,10 @@ server:
         secure: ${TLS_ENABLED:true}
         same-site: lax
 spring:
+  config:
+    # Local IDE convenience file, generated from .local/settings.json and ignored by Git.
+    # Optional: production and clean checkouts keep using environment variables.
+    import: optional:file:.local/application-local.yml,optional:file:../.local/application-local.yml
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   task:
@@ -22,6 +26,10 @@ spring:
         size: 2
   application:
     name: campus-buddy
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   profiles:
     default: demo
   datasource:

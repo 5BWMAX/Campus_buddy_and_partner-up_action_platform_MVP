@@ -37,4 +37,10 @@ public class ChatController {
       HttpServletRequest r, @PathVariable UUID id, @RequestBody Map<String, Object> b) {
     return HttpSupport.ok(service.pin(HttpSupport.actor(r), id, b));
   }
+
+  @PostMapping("/messages/{messageId}/recall")
+  public ResponseEntity<Row> recall(
+      HttpServletRequest r, @PathVariable UUID id, @PathVariable UUID messageId) {
+    return HttpSupport.ok(service.recall(HttpSupport.actor(r), messageId));
+  }
 }

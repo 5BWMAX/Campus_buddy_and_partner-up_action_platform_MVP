@@ -11,14 +11,17 @@ import org.springframework.transaction.annotation.*;
 public class IdentityService implements IdentityApi {
   private final IdentityRepository repo;
   private final Crypto crypto;
+  private final AuthMode authMode;
   private final edu.campusbuddy.activity.api.ActivityApi activities;
 
   public IdentityService(
       IdentityRepository r,
       Crypto c,
+      AuthMode mode,
       @org.springframework.context.annotation.Lazy edu.campusbuddy.activity.api.ActivityApi a) {
     repo = r;
     crypto = c;
+    authMode = mode;
     activities = a;
   }
 
@@ -32,6 +35,12 @@ public class IdentityService implements IdentityApi {
 
   public UserGrant requireVerified(UUID id) {
     UserGrant u = check(id);
+    if (authMode.formal()) {
+      Row credential = repo.credentialState(id);
+      Problem.require(credential != null, 403, "IDENTITY_REQUIRED", "需要正式注册账号");
+      Problem.require(!credential.bool("passwordChangeRequired"), 403, "PASSWORD_CHANGE_REQUIRED", "请先修改临时密码");
+      return u;
+    }
     Problem.require(u.verified(), 403, "IDENTITY_REQUIRED", "需要已验证的校内身份");
     return u;
   }
@@ -42,7 +51,31 @@ public class IdentityService implements IdentityApi {
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void lockUsers(Collection<UUID> ids) {
-    ids.stream().distinct().sorted(Comparator.comparing(UUID::toString)).forEach(repo::lock);
+    lockUsersAndReferencesInOrder(ids, List.of());
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockUserReferences(Collection<UUID> referenceIds) {
+    lockUsersAndReferencesInOrder(List.of(), referenceIds);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockUsersAndReferences(
+      Collection<UUID> updateIds, Collection<UUID> referenceOnlyIds) {
+    lockUsersAndReferencesInOrder(updateIds, referenceOnlyIds);
+  }
+
+  private void lockUsersAndReferencesInOrder(
+      Collection<UUID> updateIds, Collection<UUID> referenceOnlyIds) {
+    Set<UUID> updates = new HashSet<>(updateIds);
+    Set<UUID> all = new HashSet<>(updates);
+    all.addAll(referenceOnlyIds);
+    all.stream()
+        .sorted(Comparator.comparing(UUID::toString))
+        .forEach(id -> {
+          if (updates.contains(id)) repo.lock(id);
+          else repo.lockReference(id);
+        });
   }
 
   public List<UUID> administrators() {
@@ -68,11 +101,32 @@ public class IdentityService implements IdentityApi {
             "locationVisibility");
     if (!u.text("status").equals("DELETED"))
       out.put("contact", crypto.decrypt(u.text("contactCiphertext")));
+    if (authMode.formal()) {
+      Row credential = repo.credentialState(id);
+      if (credential != null) out.putAll(credential.only("username", "passwordChangeRequired"));
+    }
     return out;
   }
 
   public Row memberProfile(UUID id) {
-    Row u = repo.user(id);
+    return memberProfile(repo.user(id));
+  }
+
+  public Map<UUID, Row> memberProfiles(Collection<UUID> ids) {
+    List<UUID> ordered = ids.stream().distinct().toList();
+    if (ordered.isEmpty()) return Map.of();
+    Map<UUID, Row> users = new HashMap<>();
+    repo.users(ordered).forEach(u -> users.put(u.id("id"), u));
+    Map<UUID, Row> profiles = new LinkedHashMap<>();
+    for (UUID id : ordered) {
+      Row user = users.get(id);
+      if (user == null) throw Problem.missing();
+      profiles.put(id, memberProfile(user));
+    }
+    return profiles;
+  }
+
+  private Row memberProfile(Row u) {
     Row out = u.only("id", "nickname", "avatarUrl", "department");
     if (u.text("status").equals("NORMAL") && u.text("contactVisibility").equals("GROUP"))
       out.put("contact", crypto.decrypt(u.text("contactCiphertext")));

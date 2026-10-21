@@ -9,10 +9,13 @@ import org.springframework.stereotype.Repository;
 public class NotificationRepository {
   private final Sql sql;
   private final Json json;
+  private final boolean externalPushEnabled;
 
-  public NotificationRepository(Sql s, Json j) {
+  public NotificationRepository(Sql s, Json j,
+      @org.springframework.beans.factory.annotation.Value("${campus.external-push-enabled:true}") boolean externalPushEnabled) {
     sql = s;
     json = j;
+    this.externalPushEnabled = externalPushEnabled;
   }
 
   public void record(UUID recipient, String type, UUID event, Row payload) {
@@ -25,7 +28,7 @@ public class NotificationRepository {
             recipient,
             type,
             json.write(payload));
-    if (n > 0)
+    if (n > 0 && externalPushEnabled)
       sql.update(
           "insert into delivery_task(id,event_id,recipient_id,payload) values(?,?,?,?::jsonb) on"
               + " conflict do nothing",

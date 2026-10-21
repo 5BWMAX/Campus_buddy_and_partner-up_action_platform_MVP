@@ -19,8 +19,23 @@ public class IdentityRepository {
         id);
   }
 
+  public List<Row> users(Collection<UUID> ids) {
+    if (ids.isEmpty()) return List.of();
+    String parameters = String.join(",", Collections.nCopies(ids.size(), "?"));
+    return sql.list(
+        "select u.*,p.contact_visibility,p.location_visibility from user_account u join"
+            + " privacy_setting p on p.user_id=u.id where u.id in ("
+            + parameters
+            + ")",
+        ids.toArray());
+  }
+
   public void lock(UUID id) {
     sql.must("select id from user_account where id=? for update", id);
+  }
+
+  public void lockReference(UUID id) {
+    sql.must("select id from user_account where id=? for key share", id);
   }
 
   public boolean exists(UUID id) {
@@ -58,12 +73,24 @@ public class IdentityRepository {
   }
 
   public void erase(UUID id) {
+    sql.update("delete from account_credential where user_id=?", id);
     sql.update(
         "update user_account set"
             + " status='DELETED',campus_subject=null,nickname='已注销用户',avatar_url=null,department=null,contact_ciphertext=null,verified=false"
             + " where id=?",
         id);
     privacy(id, "HIDDEN", "HIDDEN");
+    // V3 user-owned auxiliary data must disappear with the account. Participation,
+    // feedback and governance history stay as anonymised records under the retained id.
+    sql.update("delete from search_history where user_id=?", id);
+    sql.update("delete from activity_favorite where user_id=?", id);
+    sql.update("delete from notification_preference where user_id=?", id);
+    sql.update(
+        "delete from delivery_attempt where task_id in (select id from delivery_task where recipient_id=?)",
+        id);
+    sql.update("delete from delivery_task where recipient_id=?", id);
+    sql.update("delete from notification where recipient_id=?", id);
+    sql.update("delete from idempotency_record where actor_id=?", id);
     sql.update("insert into erasure_log(user_id) values(?) on conflict do nothing", id);
     revokeSessions(id);
   }
@@ -72,6 +99,10 @@ public class IdentityRepository {
     return sql.list("select id from user_account where role='ADMIN' and status='NORMAL'").stream()
         .map(r -> r.id("id"))
         .toList();
+  }
+
+  public Row credentialState(UUID id) {
+    return sql.one("select c.username,c.password_change_required from account_credential c join user_account u on u.id=c.user_id where c.user_id=? and u.demo=false and u.status<>'DELETED'", id);
   }
 
   public List<Row> demoUsers() {

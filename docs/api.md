@@ -66,14 +66,28 @@
 
 时间须满足报名截止 ≤ 确认截止 ≤ 开始 < 结束；开始必须在未来。capacity 含发起人。批准 body 示例：`{"round":1,"expectedVersion":0}`，版本取申请的 version；响应包含 status、groupId、participationId、occupied、capacity 及申请/活动版本。
 
+## V3 收藏与搜索历史
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| POST / DELETE `/activities/{id}/favorite` | 收藏 / 取消收藏；返回 `favorited` 与收藏数 |
+| GET `/activities/favorites/mine` | 本人收藏列表，游标分页，含活动摘要 |
+| GET / DELETE `/activities/search-history` | 查询 / 清空本人最近 20 条搜索历史；删除返回 200 JSON |
+| DELETE `/activities/search-history/{keyword}` | 删除一条搜索历史；返回 200 JSON |
+
+收藏和搜索历史都只对当前登录用户可见。清空/删除不再返回 204 空响应，客户端可以按统一 `{data,requestId}` 解析。
+
 ## 临时群、反馈与通知
 
 | 方法与路径 | 用途 |
 | --- | --- |
 | GET `/groups/{id}/members` | 当前有群权限的请求者查看成员 |
 | GET `/groups/{id}/messages` | 游标消息页，附 pin、accessMode、ownerId |
-| POST `/groups/{id}/messages` | `{clientMessageId, body}`，文字消息 ≤1000 字符 |
+| POST `/groups/{id}/messages` | 文字：`{clientMessageId, body}`；图片：`{clientMessageId, mediaType:"IMAGE", mediaUrl}`，mediaUrl 必须来自本人上传 |
+| POST `/groups/{id}/messages/{messageId}/recall` | 发送者 2 分钟内撤回；服务端清空正文/媒体，仅保留 recalledAt |
 | PUT `/groups/{id}/pin` | 发起人设置置顶；`{body, expectedVersion}` |
+| POST `/media/upload` | multipart `file`，≤5MB，JPEG/PNG/GIF/WebP；返回 `/uploads/<uuid>.<ext>` 并记录 media_file |
+| GET / PUT `/notifications/preferences` | 通知偏好，含 pendingReminder、feedbackReminder、groupMessage 等 |
 | GET `/activities/{id}/feedback` | 查询反馈资格、本人已有反馈及可评价对象 |
 | POST `/activities/{id}/feedback` | completion、experience、reason、ratings |
 | GET `/notifications` | unreadOnly、cursor、pageSize；仅本人通知 |

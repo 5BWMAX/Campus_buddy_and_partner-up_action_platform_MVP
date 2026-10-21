@@ -10,6 +10,8 @@ public interface ActivityApi {
 
   Row lock(UUID id);
 
+  Row share(UUID id);
+
   Row lockOpen(UUID id);
 
   void advance(UUID id);
