@@ -122,7 +122,7 @@ pwsh -NoProfile -File .\scripts\start-lan.ps1 -Address 192.168.1.23
 4. `deploy/nginx.conf` 使用相对 Nginx prefix 的证书路径（`../localhost.crt`、`../localhost.key`），项目目录变化时不需要改绝对路径。执行 `scripts/enable-db-tls.ps1` 为本机 PostgreSQL 配置证书、reload 并验证连接；这会修改该 PostgreSQL 实例的三个 TLS 设置。
 5. 执行 build、start；烟测需要安装 Playwright 并将 `PLAYWRIGHT_MODULE` 设为实际模块路径，或让 Node 能解析 `playwright`。
 
-新机初始化自动化、证书生命周期和生产部署归后续集成工作。已有环境不必重复运行 setup。
+Windows 已有环境不必重复运行 setup。Ubuntu 内部演示部署参见[云服务器部署指南](docs/cloud-deployment.md)，包含首次初始化脚本、入口访问保护、备份与回滚；正式身份认证和受信任证书生命周期仍需另行配置。
 
 ## 隐私与提交注意
 
@@ -137,4 +137,5 @@ pwsh -NoProfile -File .\scripts\start-lan.ps1 -Address 192.168.1.23
 - [API 使用说明](docs/api.md)
 - [FR / NFR / T-01～T-26 验收对照](docs/acceptance.md)
 - [课堂演示手册](docs/demo.md)
+- [Ubuntu 云服务器部署与运维](docs/cloud-deployment.md)
 - [后续优化与集成任务](docs/next-steps.md)
